@@ -1,0 +1,14 @@
+CREDITS
+=======
+
+* SGE Information Reporter was originally developed based on 
+  the LCGPBS implementation distributeed by the Large Hadron 
+  Collider Compute Grid (LCG) project.
+
+* Designed to be used within the Generic Information Provider
+  framework originally developed by Jonathan Schaeffer at 
+  cc.in2p3.fr.
+
+* Development of the Information Reporter at the London 
+  e-Science Centre, including virtual queue support, was funded
+  by the UK GridPP project.

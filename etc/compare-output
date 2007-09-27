@@ -1,0 +1,79 @@
+#! /usr/bin/perl -w
+
+use strict;
+use Getopt::Long;
+
+my ( $ALL, $SHOWVO );
+
+GetOptions(
+	   'all'      => \$ALL,
+	   'showvo'   => \$SHOWVO,
+	   );
+
+my %data;
+
+foreach my $i ( 0 .. $#ARGV ) {
+    open( DATA, $ARGV[$i] )
+	or die "cannot open $ARGV[$i]: $!";
+
+    my $dn;
+    my ( @input ) = <DATA>;
+
+    close( DATA );
+
+    while ( $_ = shift @input ) {
+	while ( @input && $input[0] =~ /^\s+(.+)$/ ) {
+	    chomp( $_ ); $_ .= $1;
+	    shift @input;
+	}
+
+	if ( /^dn\: (.+)$/ ) {
+	    $dn = $1;
+	    next;
+	} elsif ( $dn && /^(\S+)\: (.*)$/ ) {
+	    $data{$dn}->{$1}[$i] = $2;
+	} elsif ( /^\s*$/ ) {
+	    $dn = undef;
+	} elsif ( /^\d+\.\d+u\s+\d+\.\d+s/ ) {
+	    # output from "time"
+	} elsif ( /^\#.*/ ) {
+	    # comment
+	} elsif ( /^version\:\s*\d+\s*$/ ) {
+	    # version number
+	} elsif ( /^search\:/ ) {
+	    # search info
+	} elsif ( /^result\:/ ) {
+	    # result info
+	} else {
+	    die "unrecognised input in $ARGV[$i]: $_\n";
+	}
+    }
+}
+
+foreach my $dn ( sort keys %data ) {
+    next if $dn =~ /^GlueVOViewLocalID\=/ && ! $SHOWVO;
+    
+    my $shown_header;
+
+    foreach my $k ( keys %{ $data{$dn} } ) {
+	my $ref = $data{$dn}->{$k}->[0];
+
+	if ( $ALL || grep( ! &same( $ref, $data{$dn}->{$k}->[$_] ), 1 .. $#ARGV ) ) {
+	    printf "\n%s\n", $dn
+		unless $shown_header++;
+	    
+	    printf "%-35s", $k;
+	    foreach ( 0 .. $#ARGV ) {
+		printf( " %10s", ( defined( $data{$dn}->{$k}->[$_] )
+				   ? $data{$dn}->{$k}->[$_]
+				   : 'undef' ) );
+	    }
+	    print "\n";
+	}
+    }
+}
+
+sub same {
+    ( defined( $_[0] ) && defined( $_[1] ) && $_[0] eq $_[1] )
+	|| ( ! defined( $_[0] ) && ! defined( $_[1] ) );
+}

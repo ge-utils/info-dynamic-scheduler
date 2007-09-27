@@ -1,0 +1,90 @@
+##############################################################################
+# Sample configuration file for SGE information reporter
+
+##############################################################################
+# The default location of this file is /etc/sge-jobmanager/info-reporter.conf
+# however this can be overriden on the command line
+
+# Default values are shown below
+
+##############################################################################
+# SGE Environment Variables...
+
+SGE_ROOT = /usr/local/sge-6.0
+SGE_ARCH = lx24-amd64
+SGE_CELL = default
+
+##############################################################################
+# Override location of SGE commands...
+# The default values are calculated using the environment variables above
+# so these configuration values shouldn't normally need to be specified
+
+# qconf_command =
+# qstat_command =
+# qselect_command =
+
+##############################################################################
+# Location of static LDIF file...
+
+# ldif_file = /opt/lcg/var/gip/ldif/static-file-CE.ldif
+
+##############################################################################
+# Location of SGE jobmanager virtual queue mapping configuration file
+# Starting from version 0.9,  /dev/null can be used if there is a one-to-one 
+# mapping between real & virtual queues
+
+# vqueue_file = /etc/sge-jobmanager/vqueues.conf
+
+##############################################################################
+# Location of file defining current cluster state
+# This file should contain one of the following strings:
+#     Production, Draining, Queueing, Closed
+
+# state_file = /etc/sge-jobmanager/cluster.state
+
+##############################################################################
+# Regular expressions matching SGE "queue instances" (ie: queue@hostname) 
+# that should be included/excluded from our calculations...  
+#
+# Default is to include everything and exclude nothing
+# Specifying these values may distort the estimated response times
+
+# queue_include_regexp = ^.*$
+# queue_exclude_regexp =
+
+##############################################################################
+# Regular expressions matching usernames that should be included/excluded
+# from our calculations
+#
+# Default is to include everything and exclude nothing
+# Specifying these values may distort the estimated response times
+
+# user_include_regexp = ^.*$
+# user_exclude_regexp =
+
+##############################################################################
+# Job efficiency
+# Used to convert cpu-time limits into estimated wallclock runtimes
+# eg:  1.0 would specify that jobs typically run at 100% efficiency
+#          and therefore the wallclock runtime equals the cpu time
+#      0.6 would specify that jobs typically only run at 60% efficiency
+
+# job_efficiency = 0.9
+
+##############################################################################
+# Default duration of jobs for which a time limit cannot be determined
+# Can be specified as <seconds>, <hours>:<minutes>:<seconds>
+#     or <days>:<hours>:<minutes>:<seconds>
+
+# default_duration = 7:00:00:00
+
+##############################################################################
+# File in which to capture information used by the information reporter
+# to generate its results.   
+# Information from this file can be converted into test data to allow the
+# calculations to be replayed for debugging/development purposes
+# Once created, the file will not be overwritten 
+# If a fresh capture is required, then the filename should be changed
+# or the file should be deleted
+
+# capture_file =

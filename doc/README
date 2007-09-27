@@ -1,0 +1,117 @@
+Sun Grid Engine Information Reporter 
+Version 0.9 - July 2007
+====================================
+
+--------------------------------------------------------------------------
+  1	ABOUT
+--------------------------------------------------------------------------
+
+This is an information reporter implementation for Sun Grid Engine[1], 
+designed to be used within the Generic Information Provider (GIP)[2] 
+framework as used in LCG-2_6_0.  It was written for use at the London 
+e-Science Centre[3] at Imperial College, London but is intended to be
+sufficiently general purpose that it can be used at other sites.
+
+This software is considered *beta* -- you use it at your own risk, and 
+although many changes have been incorporated to increase the chances of
+it working with a wide variety of SGE configurations,  there is no
+guarantee that it is compatible with the way in which your site is 
+configured.   See below for details of how to report feedback.
+
+The maintainers are aware of areas in which the information reporter
+needs further improvement,  and at least one further release is planned 
+for the near future.
+
+--------------------------------------------------------------------------
+  2     PREREQUISITES
+--------------------------------------------------------------------------
+
+This software requires that you have:
+	* Perl (tested with 5.8.1, earlier versions probably work.)
+	* XML::Simple library for Perl.
+	* Sun Grid Engine version 6.0 or later.  Versions prior to 6.0
+	  will _not_ function.  (The current implementation depends
+          on the '-xml' functionality added in the 6.0 release.)
+
+--------------------------------------------------------------------------
+  3	INSTALLATION & CONFIGURATION
+--------------------------------------------------------------------------
+
+Installation of the information reporter is trivial:
+
+a) copy the lcg-info-dynamic-sge file to your GIP dynamic plug-in
+   directory  (at LeSC this is the directory /opt/lcg/libexec)
+
+b) create a config file based on the included sample-info-reporter.conf
+   file
+
+   The default location for this file is: 
+
+	/etc/sge-jobmanager/info-reporter.conf
+
+   See the comments within the sample file for information about the
+   supported configuration options.     Most of the configuration options
+   can also be specified on the lcg-info-reporter-sge command line
+
+c) Once done you will need to update your GIP configuration to use the new 
+   plugin script; this is done by adding the following line:
+
+	dynamic_script=/opt/lcg/libexec/lcg-info-dynamic-sge /opt/lcg/var/gip/lcg-info-generic.conf
+
+   Note 1: the current maintainer has not double-checked that this step
+           is still correct as his site was already running a previous
+           version of the information reporter,  and therefore the
+           new version could simply be dropped in place
+
+   Note 2: Update the paths as appropriate for your system.  The above 
+           represents the default locations on LCG-2_6_0 installations.
+
+d) Ensure that the script is readable and executable by the user that will run
+   it (ie 'edginfo' on LCG-2_6_0 installations) and that the SGE JobManager 
+   configuration is readable by this user.   You should also check that this 
+   user is permitted to query your local cluster's state with the `qstat`,
+   `qconf` and `qselect` commands.
+
+--------------------------------------------------------------------------
+  3	TESTING
+--------------------------------------------------------------------------
+
+Testing is possible by either running the plugin directly on the command 
+line or by querying the ldap server running on the CE using the `ldapsearch`
+command.
+
+The following incantation should return the current reported state of your
+cluster:
+
+ldapsearch -x -H ldap://name.of.ce.host:2135/ -b Mds-Vo-name=local,o=grid
+
+If the script is successfully reporting information, you should be able to 
+find a GlueCEInfoLRMSType field set to 'sge' (or similiar) and a 
+GlueCEInfoLRMSVersion that matches your local installation.
+
+A utility "compare-output" is included to assist in comparing the
+output of different versions of the information reporter plugin and/or 
+ldapsearch    (though comparing the direct output from the information 
+plugin against the ldapsearch output is not currently very useful as the 
+SGE info reporter is only responsible for generating a small subset of 
+the information returned by ldapsearch)
+
+--------------------------------------------------------------------------
+ 4	FEEDBACK & PROBLEMS
+--------------------------------------------------------------------------
+
+Any problems/feedback relating to the information reporter should be
+sent via email to the current maintainer as listed in the AUTHORS
+file.
+
+Version 0.6 of the information reporter introduced a new feature whereby
+all of the information gathered from input files & SGE commands whilst
+calculating an information report can be saved into a file.  This
+file contains all of the information needed by the maintainers to replay
+an info-reporter run to track down and (hopefully) fix any problems.
+See the "capture_file" option in the sample-info-reporter.conf file.
+
+-- 
+[1] http://gridengine.sunsource.net/
+[2] http://lfield.home.cern.ch/lfield/gip/documentation.html
+[3] http://www.lesc.imperial.ac.uk/
