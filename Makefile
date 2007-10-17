@@ -16,6 +16,19 @@ install:
         
 	@install -m 0644 src/lcg-info-dynamic-sge $(prefix)/lcg/libexec/lcg-info-dynamic-sge
 
+	@mkdir -p $(prefix)/lcg/share/
+	@mkdir -p $(prefix)/lcg/share/docs/
+	@mkdir -p $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/
+
+	@install -m 0644 doc/AUTHORS $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/AUTHORS
+	@install -m 0644 doc/CREDITS $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/CREDITS        
+	@install -m 0644 doc/LICENSE $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/LICENSE
+	@install -m 0644 doc/License.GPL $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/License.GPL        
+	@install -m 0644 doc/README $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/README
+	@install -m 0644 etc/cluster.state.template $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/cluster.state.template
+	@install -m 0644 etc/info-reporter.conf.template $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/info-reporter.conf.template
+	@install -m 0644 etc/sample-vqueues.conf.template $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/sample-vqueues.conf.template
+	@install -m 0644 etc/compare-output $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/compare-output
 clean::
 	rm -rf rpmbuild 
 	rm -rf RPMS
