@@ -10,7 +10,6 @@ Group: EGEE
 Source: %{name}.src.tgz
 BuildArch: noarch
 Prefix: /opt
-Requires: glite-info-generic
 Requires: perl-XML-Simple >= 2.14
 BuildRoot: %{_tmppath}/%{name}-%{version}-build
 Packager: EGEE
@@ -32,4 +31,3 @@ make install prefix=%{buildroot}%{prefix}
 
 %clean
 rm -rf %{buildroot}
-
