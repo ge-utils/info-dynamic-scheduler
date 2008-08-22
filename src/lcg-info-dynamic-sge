@@ -7,7 +7,7 @@
 # If you modify this script locally,  please append a suitable suffix
 # to this version string
 
-use constant VERSION => '0.9';
+use constant VERSION => '0.11';
 
 # See LICENSE for licensing information.
 # See CREDITS for attributions.
@@ -79,6 +79,9 @@ $CONFIG{'job_efficiency'}      = 0.9;
 # FIXME:  This could perhaps be picked up from the "qconf -sconf" default_duration
 $CONFIG{'default_duration'}    = 7 * 24 * 60 * 60;
 
+$CONFIG{'passwd_file'}  = undef;
+$CONFIG{'group_file'}  = undef;
+
 # The following values can only be set on the command line
 
 # Variable to control debugging output
@@ -144,9 +147,43 @@ my ( @VO_INTERESTING_KEYS )
 	       GlueCEStateWorstResponseTime
 	       );
 
+my ( %NUMERIC_KEYS )
+	= map( ( $_ => 1 ),
+			qw(  GlueCEStateEstimatedResponseTime
+	       			GlueCEStateFreeJobSlots
+	       			GlueCEStateRunningJobs
+	       			GlueCEStateTotalJobs
+	       			GlueCEStateWaitingJobs
+	       			GlueCEStateWorstResponseTime
+				GlueCEStateFreeCPUs
+	       			) );
+
+
+my ( %VO_FROM_LOGIN, %VO_FROM_GROUP );
+
 # --- Process command line then validate the environment
 
 &processCommandLine();
+
+# --- Read in passwd and group files if required
+
+my ( $GETPWNAM, %LOGINS );
+
+if ( $CONFIG{'passwd_file'} ) {
+	&populate_fake( \%LOGINS, $CONFIG{'passwd_file'}, 0 );
+	$GETPWNAM = \&getpwnam_fake;
+} else {
+	$GETPWNAM = \&getpwnam_sys;
+}
+
+my ( $GETGRGID, %GROUPS );
+
+if ( $CONFIG{'group_file'} ) {
+	&populate_fake( \%GROUPS, $CONFIG{'group_file'}, 2 );
+	$GETGRGID = \&getgrgid_fake;
+} else {
+	$GETGRGID = \&getgrgid_sys;
+}
 
 # --- Validation of environment
 
@@ -296,12 +333,15 @@ sub parseConfigFile($) {
 sub processConfigEntry($$) {
 	my ( $k, $v ) = @_;
 
-	
 	if    ( $k eq 'default_duration'           ) { $CONFIG{$k} = timeValueToSeconds( $v ); }
 	elsif ( $k =~ /^sge_(root|arch|cell)$/     ) { $ENV{"\U$k"} = $v; }
 	elsif ( $k eq 'setenv' 
 		&& $v =~ /^([^=]+)\=(.*)$/         ) { $ENV{$1} = $2; }
 	elsif ( $k eq 'debug_time'                 ) { $TIME = $v; }
+	elsif ( $k eq 'group'
+		&& $v =~ /^([^=]+)\=(.*)$/         ) { $VO_FROM_GROUP{$1} = $2; }
+	elsif ( $k eq 'login'
+		&& $v =~ /^([^=]+)\=(.*)$/         ) { $VO_FROM_LOGIN{$1} = $2; }
 	elsif ( exists( $CONFIG{$k} )              ) { $CONFIG{$k} = $v; }
 	else {
 		die "unrecognised configuration entry: $k=$v";
@@ -366,7 +406,7 @@ sub lookupDNs($$) {
 		&captureInfo( $capture_idx, $_ ) if $CAPTURE_FILE;
 
 		# If the line contains a DN definition for a queue
-		if ( /^dn\:\s*((?:GlueVOViewLocalID\=([^\s\,]+)\,\s*)?GlueCEUniqueID\=\S+\/(?:jobmanager|blah)\-\w*sge\w*\-([^\,]+)\,.+)$/ ) {
+		if ( /^dn\:\s*((?:GlueVOViewLocalID\=([^\s\,]+)\,\s*)?GlueCEUniqueID\=\S+\/(?:jobmanager|blah|cream)\-\w*sge\w*\-([^\,]+)\,.+)$/ ) {
 			# We have found an entry that we are interested in
 			my ( $dn        ) = $1;
 			my ( $vo        ) = $2;
@@ -633,7 +673,7 @@ sub lookupClusterState($$) {
 
 		my $maxruntime
 			= ( defined( $max_wall_time_s )       ? $max_wall_time_s
-			    :      defined( $max_cpu_time_s ) ? int( $max_cpu_time_s / $CONFIG{'job_efficency'} )
+			    :      defined( $max_cpu_time_s ) ? int( $max_cpu_time_s / $CONFIG{'job_efficiency'} )
 			    :                                   $CONFIG{'default_duration'} );
 
 		$clusterref->{"hostq"}{$host}{$hostq}{"maxruntime"} = $maxruntime;
@@ -687,11 +727,6 @@ sub processJobDetails {
 	
 	my $currenttime = $TIME;
 
-	# FIXME: For parallel jobs that are already running,   we perhaps need to add a "queue-instance"
-	#        suffix to the jobid in order to make it unique
-	#        In this situation jobs appear in the queue multiple times.... once for each allocated
-	#        queue instance,  with the slotcount reflecting the number of slots taken up in that instance
-
 	my $jobid     = $jobentry->{"JB_job_number"};
 	my $flags     = $jobentry->{"state"}->[1];
 	my $starttime = $jobentry->{"JAT_start_time"};
@@ -699,9 +734,9 @@ sub processJobDetails {
 	my $owner     = $jobentry->{"JB_owner"};
 	my $taskcount = 1;
 
-	next if defined( $CONFIG{'user_include_regexp'} ) && $owner !~ /$CONFIG{'user_include_regexp'}/o;
-	next if defined( $CONFIG{'user_exclude_regexp'} ) && $owner =~ /$CONFIG{'user_exclude_regexp'}/o;
-	
+	return if defined( $CONFIG{'user_include_regexp'} ) && $owner !~ /$CONFIG{'user_include_regexp'}/o;
+	return if defined( $CONFIG{'user_exclude_regexp'} ) && $owner =~ /$CONFIG{'user_exclude_regexp'}/o;
+
 	# If the job isn't running, then we may still be able to determine $clusterqueue
 	# by considering if "hard_req_queue" has been set
 	
@@ -738,6 +773,14 @@ sub processJobDetails {
 		}
 	}
 	
+	if ( $clusterref->{"job"}{$jobid} ) {
+		# We already seem to have processed this job...   
+		# It is probably a running parallel job so we should simply total up the slot count
+
+		$clusterref->{"job"}{$jobid}{"slotcount"} += $slotcount;
+		return;
+	}
+		
 	my %resource;
 	while ( my ( $k, $v ) = each %{$jobentry->{'def_hard_request'}} ) {
 		$resource{$k} = $v->{'content'};
@@ -768,7 +811,7 @@ sub processJobDetails {
 		
 	my $timeremaining_secs 
 		= ( defined( $max_wall_time_s )       ? $max_wall_time_s
-		    :      defined( $max_cpu_time_s ) ? int( $max_cpu_time_s * 60 / $CONFIG{'job_efficency'} )
+		    :      defined( $max_cpu_time_s ) ? int( $max_cpu_time_s * 60 / $CONFIG{'job_efficiency'} )
 		    :                                   undef );
 
 	$timeremaining_secs 
@@ -805,20 +848,14 @@ sub processJobDetails {
 		#         guesstimate a remaining time value rather than use 0
 		$timeremaining_secs = 0 if $timeremaining_secs < 0;
 	} 
-	
+
 	# We have all our job data now, update our global data model.
 	$clusterref->{"job"}{$jobid}{"slotcount"} 	 = $slotcount;
 	$clusterref->{"job"}{$jobid}{"flags"} 		 = $flags;
 	$clusterref->{"job"}{$jobid}{"starttime"} 	 = $starttime;
 	$clusterref->{"job"}{$jobid}{"taskcount"}        = $taskcount;
 	$clusterref->{"job"}{$jobid}{"timeleft"}         = $timeremaining_secs;
-
-	# FIXME: This needs to be replaced by a combination of a mapping file + calls to 
-	#        getpwnam to lookup login groups
-
-	my $VOPAT = $clusterref->{"vopat"};
-	$clusterref->{"job"}{$jobid}{"vo"} = $2
-		if $owner =~ /^(lt2\-)?($VOPAT)(\d+|sgm\d+|prd\d+)$/o;
+	$clusterref->{"job"}{$jobid}{"vo"} 		 = &lookup_vo_for_login( $clusterref, $owner );
 	
 	my @tmp;
 	foreach my $vq ( keys %{$queueref} ) {
@@ -933,9 +970,6 @@ sub calculateVirtualQueueJobCounts($$) {
 	#	* Queued jobs in this queue
 	#	* The number of total slots in this queue (this requires clusterqueue data.)
 	foreach my $queue (@virtualqueues) {
-		# FIXME: We currently count N-processor jobs as being N different jobs.
-		#	 Is this more helpful for scheduling or should we be more precise
-		#	 and only count them as one?
 		my ($runningtotal, $queuedtotal, $slotstotal, $slotsenabled, $slotsused, $slotsfree) = (0,0,0,0,0);
 		my (%vo_runningtotals, %vo_queuedtotals);
 		# For every job:
@@ -945,14 +979,14 @@ sub calculateVirtualQueueJobCounts($$) {
 			my $vo = $clusterref->{"job"}{$job}{"vo"};
 			
 			if ($clusterref->{"job"}{$job}{"flags"} =~ /r/) {
-				$runningtotal += $clusterref->{"job"}{$job}{"slotcount"};
-				$vo_runningtotals{$vo} += $clusterref->{"job"}{$job}{"slotcount"} if defined( $vo );
+				$runningtotal++;
+				$vo_runningtotals{$vo}++ if defined( $vo );
 			} 
 			# Otherwise, assuming the job is not in an error state,
 			# add it's slotcount to our total number of queueing jobs.
 			elsif ($clusterref->{"job"}{$job}{"flags"} !~ /E/) {
-				$queuedtotal += $clusterref->{"job"}{$job}{"slotcount"};
-				$vo_queuedtotals{$vo} += $clusterref->{"job"}{$job}{"slotcount"} if defined( $vo );
+				$queuedtotal++;
+				$vo_queuedtotals{$vo}++ if defined( $vo );
 			}
 		}
 		# For every hostqueue that services a virtual queue
@@ -1018,7 +1052,6 @@ sub calculateVirtualQueueJobCounts($$) {
 
 		# Now that we have calculated the various statistics for this virtual queue:
 		# Update our internal model:
-		$queueref->{$queue}{"occupiedslots"} = $runningtotal;
 		$queueref->{$queue}{"freeslots"} = $slotsfree;
 		$queueref->{$queue}{"totalslots"} = $slotsenabled;
 		$queueref->{$queue}{"queuedjobs"} = $queuedtotal;
@@ -1184,6 +1217,51 @@ sub timeValueToSeconds($) {
 	$result;
 }
 
+# Convert login name to a VO
+
+sub lookup_vo_for_login {
+	my ( $clusterref, $login ) = @_;
+
+	my $vo = $VO_FROM_LOGIN{$login};
+
+	return $vo if defined( $vo );
+	
+	if ( my @pw = &{$GETPWNAM}($login) ) {
+		# We have found the user in the passwd file
+
+		if ( my ( $group ) = &{$GETGRGID}($pw[3]) ) {
+			if ( ! defined( $vo = $VO_FROM_GROUP{$group} ) ) {
+				my $VOPAT = $clusterref->{"vopat"};
+				$vo = $VO_FROM_GROUP{$group} = $3
+					if $group =~ /^(\w+\-)?(sgm|prd)?($VOPAT)(sgm|prd)?\d*$/o;
+			}
+		}
+	}
+
+	$VO_FROM_LOGIN{$login} = $vo if defined( $vo );
+
+	$vo;
+}
+
+sub getpwnam_sys { getpwnam(@_); }
+sub getgrgid_sys { getgrgid(@_); }
+
+sub getpwnam_fake { @{$LOGINS{$_[0]}}; };
+sub getgrgid_fake { @{$GROUPS{$_[0]}}; };
+
+sub populate_fake {
+	my ( $hash, $filename, $i ) = @_;
+	
+	if ( open( FILE, $filename ) ) {
+		while ( <FILE> ) {
+			chomp;
+			my ( @v ) = split( /\:/, $_ );
+			$hash->{$v[$i]} = \@v if ! defined( $hash->{$v[$i]} );
+		}
+		close( FILE );
+	}
+}
+	
 # --- Main program ------------------------------------------------------
 
 # We have already processed our command line and config file by the
@@ -1230,7 +1308,6 @@ my (%cluster);
 #	},
 #	jobs => { "97500" => 1 },
 #	hostqueue => { mars100.mars.lesc.doc.ic.ac.uk => { debug => 1, i240 => 1 } }
-#	occupiedslots => 1,
 #	totalslots => 147,
 #	freeslots => 0,
 #	queuedjobs => 57
@@ -1307,16 +1384,19 @@ foreach ( @dn ) {
 
 	if ( defined( $vo ) ) {
 		foreach ( @VO_INTERESTING_KEYS ) {
+			my $fmt = $NUMERIC_KEYS{$_} ? "%s: %d\n" : "%s: %s\n";
+
 			if ( defined( $vo_gluevalues->{$vo}->{$_} ) ) {
-				printf( "%s: %s\n", $_, $vo_gluevalues->{$vo}->{$_} );
+				printf( $fmt, $_, $vo_gluevalues->{$vo}->{$_} );
 			} elsif ( defined( $gluevalues->{$_} ) ) {
-				printf( "%s: %s\n", $_, $gluevalues->{$_} );
+				printf( $fmt, $_, $gluevalues->{$_} );
 			}
 		}
 	} else {
 		# Print out values.
 		foreach ( sort keys %{$gluevalues} ) {
-			printf "%s: %s\n", $_, $gluevalues->{$_};
+			my $fmt = $NUMERIC_KEYS{$_} ? "%s: %d\n" : "%s: %s\n";
+			printf $fmt, $_, $gluevalues->{$_};
 		}
 	}
 

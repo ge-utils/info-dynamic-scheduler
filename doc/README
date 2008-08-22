@@ -1,5 +1,5 @@
 Sun Grid Engine Information Reporter 
-Version 0.9 - July 2007
+Version 0.11 - April 2008
 ====================================
 
 --------------------------------------------------------------------------
@@ -16,7 +16,7 @@ This software is considered *beta* -- you use it at your own risk, and
 although many changes have been incorporated to increase the chances of
 it working with a wide variety of SGE configurations,  there is no
 guarantee that it is compatible with the way in which your site is 
-configured. See below for details of how to report feedback.
+configured.   See below for details of how to report feedback.
 
 The maintainers are aware of areas in which the information reporter
 needs further improvement,  and at least one further release is planned 
@@ -39,26 +39,24 @@ This software requires that you have:
 
 Installation of the information reporter is trivial:
 
-a) YAIM SGE_utils Module will copy the lcg-info-dynamic-sge file to your 
-   GIP dynamic plug-in directory (at LeSC this is the directory /opt/lcg/libexec)
+a) copy the lcg-info-dynamic-sge file to your GIP dynamic plug-in
+   directory  (at LeSC this is the directory /opt/lcg/libexec)
 
-b) YAIM SGE_utils Module will create a config file based on the included 
-   sample-info-reporter.conf file in /opt/lcg/share/docs/lcg-info-dynamic-sge
+b) create a config file based on the included sample-info-reporter.conf
+   file
 
    The default location for this file is: 
 
 	/etc/sge-jobmanager/info-reporter.conf
 
    See the comments within the sample file for information about the
-   supported configuration options. Most of the configuration options
+   supported configuration options.     Most of the configuration options
    can also be specified on the lcg-info-reporter-sge command line
 
-c) The YAIM SGE_utils Module will update the GIP configuration to use 
-   the new plugin script; this is done by adding the following line:
+c) Once done you will need to update your GIP configuration to use the new 
+   plugin script; this is done by adding the following line:
 
-	dynamic_script=/opt/lcg/libexec/lcg-info-dynamic-sge 
-
-   in /opt/glite/etc/gip/glite-info-generic.conf
+	dynamic_script=/opt/lcg/libexec/lcg-info-dynamic-sge /opt/lcg/var/gip/lcg-info-generic.conf
 
    Note 1: the current maintainer has not double-checked that this step
            is still correct as his site was already running a previous
