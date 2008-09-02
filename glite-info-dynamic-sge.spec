@@ -25,8 +25,9 @@ This package contains the information plugin to gLite middleware
 make install prefix=%{buildroot}%{prefix}
 
 %files
+%defattr(0755,root,root)
+%config(noreplace) %{prefix}/lcg/libexec/lcg-info-dynamic-sge
 %defattr(0644,root,root)
-%{prefix}/lcg/libexec/lcg-info-dynamic-sge
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/AUTHORS
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/CREDITS
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/LICENSE
