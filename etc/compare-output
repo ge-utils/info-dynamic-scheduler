@@ -3,12 +3,15 @@
 use strict;
 use Getopt::Long;
 
-my ( $ALL, $SHOWVO );
+my ( $ALL, $SHOWVO, $BYQUEUE );
+my %FIELDS;
 
 GetOptions(
-	   'all'      => \$ALL,
-	   'showvo'   => \$SHOWVO,
-	   );
+    'all'      => \$ALL,
+    'showvo'   => \$SHOWVO,
+    'byqueue'  => \$BYQUEUE,
+    'fields=s' => sub { $FIELDS{$_[1]}++; },
+    ) or die;
 
 my %data;
 
@@ -58,11 +61,25 @@ foreach my $dn ( sort keys %data ) {
     foreach my $k ( keys %{ $data{$dn} } ) {
 	my $ref = $data{$dn}->{$k}->[0];
 
+	next if %FIELDS && ! $FIELDS{$k};
+	
+	my $lineprefix = '';
+	
+	if ( $BYQUEUE ) {
+	    my $queue = '';
+	    my $vo    = '';
+
+	    $queue = $1 if $dn =~ m~(?:jobmanager|blah|cream)\-[^\-]+\-([^\,]+)\,~;
+	    $vo    = $1 if $dn =~ /^GlueVOViewLocalID\=([^\,]+)\,/;
+	    
+	    $lineprefix = sprintf( "%-10s %-10s ", $queue, $vo );
+	}
+	
 	if ( $ALL || grep( ! &same( $ref, $data{$dn}->{$k}->[$_] ), 1 .. $#ARGV ) ) {
 	    printf "\n%s\n", $dn
-		unless $shown_header++;
+		unless $BYQUEUE || $shown_header++;
 	    
-	    printf "%-35s", $k;
+	    printf "%s%-35s", $lineprefix, $k;
 	    foreach ( 0 .. $#ARGV ) {
 		printf( " %10s", ( defined( $data{$dn}->{$k}->[$_] )
 				   ? $data{$dn}->{$k}->[$_]

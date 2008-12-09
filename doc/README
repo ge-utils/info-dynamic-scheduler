@@ -1,93 +1,183 @@
-Sun Grid Engine Information Reporter 
-Version 0.11 - April 2008
-====================================
+Sun Grid Engine - GIP LRMS and BLAHP-helper interfaces
+======================================================
+
+Version:  0.902
+Date:     16th November 2008
 
 --------------------------------------------------------------------------
-  1	ABOUT
+1. ABOUT
 --------------------------------------------------------------------------
 
-This is an information reporter implementation for Sun Grid Engine[1], 
-designed to be used within the Generic Information Provider (GIP)[2] 
-framework as used in LCG-2_6_0.  It was written for use at the London 
-e-Science Centre[3] at Imperial College, London but is intended to be
-sufficiently general purpose that it can be used at other sites.
+Starting from version 0.900,  this program currently has two primary
+functions...
 
-This software is considered *beta* -- you use it at your own risk, and 
-although many changes have been incorporated to increase the chances of
-it working with a wide variety of SGE configurations,  there is no
-guarantee that it is compatible with the way in which your site is 
-configured.   See below for details of how to report feedback.
+a) To provide support for the Sun Grid Engine (SGE)[1] batch system within
+   the Generic Information Provider (GIP)[2] framework used by the LCG
+   and glite software stacks
 
-The maintainers are aware of areas in which the information reporter
-needs further improvement,  and at least one further release is planned 
-for the near future.
+b) To act as a helper program for use by the SGE interface to BLAHP 
+   that is used on Computing Elements (CEs) using glite and CREAM
+   software    (as opposed to the older LCG CE which was based around
+   globus)
 
 --------------------------------------------------------------------------
-  2     PREREQUISITES
+2. PREREQUISITES
 --------------------------------------------------------------------------
 
-This software requires that you have:
-	* Perl (tested with 5.8.1, earlier versions probably work.)
-	* XML::Simple library for Perl.
-	* Sun Grid Engine version 6.0 or later.  Versions prior to 6.0
-	  will _not_ function.  (The current implementation depends
-          on the '-xml' functionality added in the 6.0 release.)
+This software requires:
+
+* Perl   
+
+  Tested with 5.8 & 5.10
+
+* XML::Twig perl module 
+
+  Tested with 3.32,  but any version later than 3.0 should probably work
+
+  NOTE:  Earlier versions of lcg-info-dynamic-sge used XML::Simple instead
+
+* Time::Local perl module
+
+* Sun Grid Engine version 6.0 or later
+
+  Tested with 6.0u9, 6.1u3 and 6.1u5
+
+  Versions of SGE prior to 6.0 lack the required XML support
 
 --------------------------------------------------------------------------
-  3	INSTALLATION & CONFIGURATION
+3. INSTALLATION & CONFIGURATION for use as Information Plugin
 --------------------------------------------------------------------------
 
-Installation of the information reporter is trivial:
+a) Install the script sge_helper in a location of your choice
 
-a) copy the lcg-info-dynamic-sge file to your GIP dynamic plug-in
-   directory  (at LeSC this is the directory /opt/lcg/libexec)
+   Create symlinks in the directory /opt/lcg/libexec to allow the
+   program to be run using the following names:
 
-b) create a config file based on the included sample-info-reporter.conf
-   file
+   /opt/lcg/libexec/lcg-info-dynamic-sge
+   /opt/lcg/libexec/lrmsinfo-sge
+   /opt/lcg/libexec/vomaxjobs-sge
 
-   The default location for this file is: 
 
-	/etc/sge-jobmanager/info-reporter.conf
+   IF you don't want to create these symlinks then you can also
+   call the program using its original name and add the arguments
+   "--info", "--lrmsinfo" or "--vomaxjobs" respectively to select
+   the appropriate output.      All of the locations described
+   below where the name of the program needs to be specified allow
+   arguments to be given.
 
-   See the comments within the sample file for information about the
-   supported configuration options.     Most of the configuration options
-   can also be specified on the lcg-info-reporter-sge command line
+b) Modify the configuration file for lcg-info-dynamic-scheduler...
+   (normally: /opt/lcg/etc/lcg-info-dynamic-scheduler.conf)
 
-c) Once done you will need to update your GIP configuration to use the new 
-   plugin script; this is done by adding the following line:
+   * Make sure the "[Main]" section includes sensible values for
+     "static_ldif_file" and "vomap"
 
-	dynamic_script=/opt/lcg/libexec/lcg-info-dynamic-sge /opt/lcg/var/gip/lcg-info-generic.conf
+   * In the section "[LRMS]" set the value of "lrms_backend_cmd" to:
 
-   Note 1: the current maintainer has not double-checked that this step
-           is still correct as his site was already running a previous
-           version of the information reporter,  and therefore the
-           new version could simply be dropped in place
+     lrms_backend_cmd : /opt/lcg/libexec/lrmsinfo-sge -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
 
-   Note 2: Update the paths as appropriate for your system.  The above 
-           represents the default locations on LCG-2_6_0 installations.
+   * Optionally:   
 
-d) Ensure that the script is readable and executable by the user that will run
-   it (ie 'edginfo' on LCG-2_6_0 installations) and that the SGE JobManager 
-   configuration is readable by this user.   You should also check that this 
-   user is permitted to query your local cluster's state with the `qstat`,
-   `qconf` and `qselect` commands.
+     IF SGE is setup with differing numbers of slots per queue 
+     AND the different queues are setup for different VOs
+     AND you want slightly better estimates to be calculated for
+         the per vo freeslot values
+	 
+     THEN
+
+     Add the following to the section "[Scheduler]"
+
+     vo_max_jobs_cmd : /opt/lcg/libexec/vomaxjobs-sge -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
+
+
+     NOTE:  Enabling this option currently doubles the length of time
+     that lcg-info-dynamic-scheduler takes to run,  and probably won't
+     have any effect on the results unless the conditions above are 
+     satisfied.
+
+     Use of this option is strongly discouraged,  and discussions
+     are underway at removing this option in favour of trying to
+     persuade the authors of lcg-info-dynamic-scheduler to 
+     modify the batch system interface used by their code.
+
+c) Optionally create the following configuration files:
+
+   * /etc/sge-jobmanager/cluster.state
+
+     Containing the current status of the cluster 
+     (either: Production, Queueing, Draining or Closed)
+
+     If the file is missing, then the cluster state defaults to
+     "Production"
+
+   * /etc/sge-jobmanager/info-reporter.conf
+
+     Containing a configuration file similar to the one used by previous
+     versions of lcg-info-dynamic-sge
+
+     Note: Not all of the configuration options from earlier versions
+           of lcg-info-dynamic-sge actually do anything in this
+           version of the software
+ 	  
+     A combination of command line arguments and the contents of this
+     file can be used to override most of the defaults used by the
+     program.
+
+   * /etc/sge-jobmanager/vqueues.conf
+
+     Note: This file isn't needed if there is a one-to-one mapping
+           between the queue names used by SGE and the queues that
+           appear in your static ldif file
+
+	   It should only be needed if you wish to use virtual queues
+           as supported by one of the job managers developed at 
+           Imperial College London.
+
+	   If you are using the job manager developed by CESGA then
+	   you are better off NOT creating this file
+
+	   Starting from version 0.902,  this file will only be read
+           from its default location if the use of LeSC's job manager
+           is detected (from the presense of "sge" rather than "lcgsge"
+           in the static ldif file)
+
+d) Ensure that the sge commands "qstat" and "qconf" work when run
+   by the login account used by the information reporter 
+   (typically: edginfo)
+
+e) Ensure that the "gip" plugin directory contains scripts that will run
+   the following two commands:
+
+   /opt/lcg/libexec/lcg-info-dynamic-scheduler -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
+   /opt/lcg/libexec/lcg-info-dynamic-sge -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
+
+   The gip plugin directory is normally located:
+
+        /opt/lcg/var/gip/plugin        (glite 3.0)
+   or   /opt/glite/etc/gip/plugin      (glite 3.1)
 
 --------------------------------------------------------------------------
-  3	TESTING
+4. TESTING
 --------------------------------------------------------------------------
 
-Testing is possible by either running the plugin directly on the command 
+Testing is possible by either running the programs directly on the command 
 line or by querying the ldap server running on the CE using the `ldapsearch`
-command.
+command.      
+
+Note: Starting from version 1.000 both "lcg-info-dynamic-sge" and
+"lcg-info-dynamic-scheduler" need to be run instead of just 
+"lcg-info-dynamic-sge"
+
 
 The following incantation should return the current reported state of your
 cluster:
 
+glite 3.0:
+
 ldapsearch -x -H ldap://name.of.ce.host:2135/ -b Mds-Vo-name=local,o=grid
 
-If the script is successfully reporting information, you should be able to 
-find a GlueCEInfoLRMSType field set to 'sge' (or similiar) and a 
-GlueCEInfoLRMSVersion that matches your local installation.
+glite 3.1:
+
+ldapsearch -x -H ldap://name.of.ce.host:2170/ -b Mds-Vo-name=resource,o=grid
 
 A utility "compare-output" is included to assist in comparing the
 output of different versions of the information reporter plugin and/or 
@@ -97,19 +187,95 @@ SGE info reporter is only responsible for generating a small subset of
 the information returned by ldapsearch)
 
 --------------------------------------------------------------------------
- 4	FEEDBACK & PROBLEMS
+5. KNOWN PROBLEMS
+--------------------------------------------------------------------------
+
+* Some versions of SGE 6.1 prior to 6.1u5 have a bug in their XML output 
+  that can cause "slot" counts for queues to be wrong.   
+
+  A workaround has been implemented that is applied if a version of SGE is 
+  detected that is known to exhibit this bug  (currently 6.1u3 and 6.1u4),
+  however it hasn't been confirmed that the workaround is correct in all
+  circumstances,   and there may well be other versions of SGE that suffer
+  from the same problem.
+
+* There is a deficiency in the design of "lcg-info-dynamic-scheduler" 
+  that can result in seemingly incorrect values being reported...
+
+  In particular,  the script fails to take into account:
+
+  * The maximum number of slots each queue is permitted to use
+  * Which queues & VOs are allowed to use each slot
+
+  Values are likely to end up most accurate when:
+
+  * All queues (and VOs) have access to the same set of execution
+    slots
+
+  This problem is particularly apparent in the calculation of the
+  per VO values for "GlueCEStateFreeJobSlots"
+
+  In addition,  
+
+  * the system may underestimate response times in situations where 
+  there are free slots available in the cluster that are unavailable 
+  for use by specific VOs/queues AND there are no queued jobs for 
+  those VOs/queues   (therefore the system can't detect that the
+  slots are ineligible to be used)
+
+  and 
+
+  * overestimate worst case response times when some slots
+    are reserved for running certain categories of jobs
+
+  In order to fix this problem,  the interfaces that 
+  lcg-info-dynamic-scheduler uses to obtain information about the
+  queuing system would need to be changed/enhanced.
+  
+  Enabling "vomaxjobs-sge" partially addresses the problem, but
+  doesn't fix it.
+
+* "lrmsinfo-sge" is currently unable to provide information about
+  the time at which "running" jobs were queued due to the fact
+  that qstat normally only reports the time at which jobs last
+  changed state.
+
+  Although the documentation for the "lrmsinfo" interface indicates
+  that this information should be provided for all jobs,  an
+  analysis of "lcg-info-dynamic-scheduler" seems to indicate that
+  information is only currently referred to for jobs in "queued"
+  state
+
+--------------------------------------------------------------------------
+6. FUTURE ENHANCEMENTS
+--------------------------------------------------------------------------
+ 
+* Each time the site BDII is updated,  the sge_helper script ends
+  up running either two or three times (depending on whether
+  "vo_max_jobs_cmd" is set) - performing almost identical queries 
+  against the queuing system each time.
+
+  It is intended that a future version of the script will cache
+  results in a file so that the duplicated effort can be avoided
+
+* Information about the state of the queues may be cached between
+  runs so that the "queued" time for each job can be recorded
+  for use by "lrmsinfo-sge".   
+
+--------------------------------------------------------------------------
+7. FEEDBACK & PROBLEMS
 --------------------------------------------------------------------------
 
 Any problems/feedback relating to the information reporter should be
 sent via email to the current maintainer as listed in the AUTHORS
 file.
 
-Version 0.6 of the information reporter introduced a new feature whereby
-all of the information gathered from input files & SGE commands whilst
-calculating an information report can be saved into a file.  This
-file contains all of the information needed by the maintainers to replay
-an info-reporter run to track down and (hopefully) fix any problems.
-See the "capture_file" option in the sample-info-reporter.conf file.
+The "capture_file" facility supported by earlier versions of
+lcg-info-dynamic-sge is unfortunately not currently available.
+
+Instead,  if you wish to report a problem, please include the contents of
+any configuration files along with the output of the command 
+"qstat -xml -u * -f -r -F"
 
 -- 
 [1] http://gridengine.sunsource.net/

@@ -3,6 +3,16 @@
 # SGE JobManager queue mapping file
 # =================================
 #
+# IMPORTANT:  Starting from version 0.9 of the information provider
+#
+#             This file is NOT needed in simple configurations where there
+#             is a one-to-one mapping between queue names used by SGE and
+#             queue names in the static LDIF file
+#
+#             In such situations,  the file should either be left empty,
+#             specified as /dev/null     (or starting from 1.001... omitted
+#             altogether)
+#
 # It is sometimes desirable to be able to override various RSL properties of
 # jobs submitted to Globus based on the name of the queue that was requested.
 #
@@ -26,11 +36,6 @@
 #
 # Spaces are currently not permitted as any value.
 
-# Starting from version 0.9 of the information provider,  the default
-# queue mapping for any queues not listed in here is for the virtual
-# queue to map directly onto a real queue of the same name...  which
-# is equivalant to the entry:
-#
 #       <queuename>   queue   <queuename>
 
 # Virtual

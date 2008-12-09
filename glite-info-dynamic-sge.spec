@@ -26,7 +26,7 @@ make install prefix=%{buildroot}%{prefix}
 
 %files
 %defattr(0755,root,root)
-%config(noreplace) %{prefix}/lcg/libexec/lcg-info-dynamic-sge
+%config(noreplace) %{prefix}/lcg/libexec/sge_helper
 %defattr(0644,root,root)
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/AUTHORS
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/CREDITS
@@ -34,7 +34,7 @@ make install prefix=%{buildroot}%{prefix}
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/License.GPL
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/README
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/cluster.state.template
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/info-reporter.conf.template
+%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/sample-info-reporter.conf.template
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/sample-vqueues.conf.template
 %{prefix}/lcg/share/docs/lcg-info-dynamic-sge/compare-output
 
