@@ -10,7 +10,7 @@ Group: EGEE
 Source: %{name}.src.tgz
 BuildArch: noarch
 Prefix: /opt
-Requires: perl-XML-Simple >= 2.14
+Requires: perl-XML-Twig >= 3.0
 BuildRoot: %{_tmppath}/%{name}-%{version}-build
 Packager: EGEE
 
