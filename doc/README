@@ -1,8 +1,8 @@
 Sun Grid Engine - GIP LRMS and BLAHP-helper interfaces
 ======================================================
 
-Version:  0.902
-Date:     16th November 2008
+Version:  0.903
+Date:     23rd December 2008
 
 --------------------------------------------------------------------------
 1. ABOUT
@@ -66,14 +66,14 @@ a) Install the script sge_helper in a location of your choice
    arguments to be given.
 
 b) Modify the configuration file for lcg-info-dynamic-scheduler...
-   (normally: /opt/lcg/etc/lcg-info-dynamic-scheduler.conf)
+   (normally: /opt/glite/etc/lcg-info-dynamic-scheduler.conf)
 
    * Make sure the "[Main]" section includes sensible values for
      "static_ldif_file" and "vomap"
 
    * In the section "[LRMS]" set the value of "lrms_backend_cmd" to:
 
-     lrms_backend_cmd : /opt/lcg/libexec/lrmsinfo-sge -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
+     lrms_backend_cmd : /opt/lcg/libexec/lrmsinfo-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
 
    * Optionally:   
 
@@ -86,7 +86,7 @@ b) Modify the configuration file for lcg-info-dynamic-scheduler...
 
      Add the following to the section "[Scheduler]"
 
-     vo_max_jobs_cmd : /opt/lcg/libexec/vomaxjobs-sge -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
+     vo_max_jobs_cmd : /opt/lcg/libexec/vomaxjobs-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
 
 
      NOTE:  Enabling this option currently doubles the length of time
@@ -147,8 +147,8 @@ d) Ensure that the sge commands "qstat" and "qconf" work when run
 e) Ensure that the "gip" plugin directory contains scripts that will run
    the following two commands:
 
-   /opt/lcg/libexec/lcg-info-dynamic-scheduler -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
-   /opt/lcg/libexec/lcg-info-dynamic-sge -c /opt/lcg/etc/lcg-info-dynamic-scheduler.conf
+   /opt/lcg/libexec/lcg-info-dynamic-scheduler -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
+   /opt/lcg/libexec/lcg-info-dynamic-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
 
    The gip plugin directory is normally located:
 

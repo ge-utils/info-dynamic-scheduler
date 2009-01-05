@@ -3,7 +3,7 @@
 # If you modify this script locally,  please append a suitable suffix
 # to this version string
 
-use constant VERSION => '0.902';
+use constant VERSION => '0.903';
 
 # See LICENSE for licensing information.
 # See CREDITS for attributions.
@@ -134,10 +134,12 @@ $IGNORECONFIG{'capture_file'}  = 1;
 
 my %SGE;
 
-if ( $0 =~ /\blrmsinfo\-sge$/ )  { unshift( @ARGV, '--lrmsinfo' );
-} elsif ( $0 =~ /\binfo$/ )      { unshift( @ARGV, '--info' );
-} elsif ( $0 =~ /\bvomaxjobs$/ ) { unshift( @ARGV, '--vomaxjobs' );
+if ( $0 =~ /^(.*\/)?lrmsinfo\-sge$/ )  { unshift( @ARGV, '--lrmsinfo' );
+} elsif ( $0 =~ /^(.*\/)?lcg\-info\-dynamic\-sge$/ )      { unshift( @ARGV, '--info' );
+} elsif ( $0 =~ /^(.*\/)?vomaxjobs\-sge$/ ) { unshift( @ARGV, '--vomaxjobs' );
 }
+
+#die "ARGS:\n", map( "\"$_\"\n", $0, @ARGV );
 
 GetOptions(
 #    'status'          => sub { $QSTAT = 1; $QACCT = 1; $CLASSAD = 1; },
@@ -238,6 +240,8 @@ if ( $QSTAT ) {
 
 if ( $INFO ) {
     # TODO: Values involving $SGE{$CELL} should check to see which cell the queue is associated with
+    
+    &read_clusterstate_file();
     
     foreach ( @DNs ) {
 	my ( $dn, $qname ) = @{$_};
