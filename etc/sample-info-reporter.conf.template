@@ -30,7 +30,7 @@ SGE_CELL = default
 ##############################################################################
 # Location of static LDIF file...
 
-# ldif_file = /opt/lcg/var/gip/ldif/static-file-CE.ldif
+# ldif_file = /opt/glite/etc/gip/ldif/static-file-CE.ldif
 
 ##############################################################################
 # Location of SGE jobmanager virtual queue mapping configuration file

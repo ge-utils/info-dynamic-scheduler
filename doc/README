@@ -50,12 +50,12 @@ This software requires:
 
 a) Install the script sge_helper in a location of your choice
 
-   Create symlinks in the directory /opt/lcg/libexec to allow the
+   Create symlinks in the directory /opt/glite/libexec to allow the
    program to be run using the following names:
 
-   /opt/lcg/libexec/lcg-info-dynamic-sge
-   /opt/lcg/libexec/lrmsinfo-sge
-   /opt/lcg/libexec/vomaxjobs-sge
+   /opt/glite/libexec/lcg-info-dynamic-sge
+   /opt/glite/libexec/lrmsinfo-sge
+   /opt/glite/libexec/vomaxjobs-sge
 
 
    IF you don't want to create these symlinks then you can also
@@ -73,7 +73,7 @@ b) Modify the configuration file for lcg-info-dynamic-scheduler...
 
    * In the section "[LRMS]" set the value of "lrms_backend_cmd" to:
 
-     lrms_backend_cmd : /opt/lcg/libexec/lrmsinfo-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
+     lrms_backend_cmd : /opt/glite/libexec/lrmsinfo-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
 
    * Optionally:   
 
@@ -86,7 +86,7 @@ b) Modify the configuration file for lcg-info-dynamic-scheduler...
 
      Add the following to the section "[Scheduler]"
 
-     vo_max_jobs_cmd : /opt/lcg/libexec/vomaxjobs-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
+     vo_max_jobs_cmd : /opt/glite/libexec/vomaxjobs-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
 
 
      NOTE:  Enabling this option currently doubles the length of time
@@ -148,7 +148,7 @@ e) Ensure that the "gip" plugin directory contains scripts that will run
    the following two commands:
 
    /opt/lcg/libexec/lcg-info-dynamic-scheduler -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
-   /opt/lcg/libexec/lcg-info-dynamic-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
+   /opt/glite/libexec/lcg-info-dynamic-sge -c /opt/glite/etc/lcg-info-dynamic-scheduler.conf
 
    The gip plugin directory is normally located:
 

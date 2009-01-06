@@ -9,7 +9,7 @@ License: EGEE
 Group: EGEE
 Source: %{name}.src.tgz
 BuildArch: noarch
-Prefix: /opt
+Prefix: /opt/glite
 Requires: perl-XML-Twig >= 3.0
 BuildRoot: %{_tmppath}/%{name}-%{version}-build
 Packager: EGEE
@@ -26,17 +26,17 @@ make install prefix=%{buildroot}%{prefix}
 
 %files
 %defattr(0755,root,root)
-%config(noreplace) %{prefix}/lcg/libexec/sge_helper
+%config(noreplace) %{prefix}/libexec/sge_helper
 %defattr(0644,root,root)
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/AUTHORS
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/CREDITS
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/LICENSE
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/License.GPL
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/README
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/cluster.state.template
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/sample-info-reporter.conf.template
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/sample-vqueues.conf.template
-%{prefix}/lcg/share/docs/lcg-info-dynamic-sge/compare-output
+%{prefix}/share/doc/glite-info-dynamic-sge/AUTHORS
+%{prefix}/share/doc/glite-info-dynamic-sge/CREDITS
+%{prefix}/share/doc/glite-info-dynamic-sge/LICENSE
+%{prefix}/share/doc/glite-info-dynamic-sge/License.GPL
+%{prefix}/share/doc/glite-info-dynamic-sge/README
+%{prefix}/share/doc/glite-info-dynamic-sge/cluster.state.template
+%{prefix}/share/doc/glite-info-dynamic-sge/sample-info-reporter.conf.template
+%{prefix}/share/doc/glite-info-dynamic-sge/sample-vqueues.conf.template
+%{prefix}/share/doc/glite-info-dynamic-sge/compare-output
 
 %clean
 rm -rf %{buildroot}

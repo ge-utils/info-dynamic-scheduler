@@ -1,4 +1,4 @@
-prefix=/opt
+prefix=/opt/glite
 package=glite-info-dynamic-sge
 name=$Name:  $
 tag:=$(shell echo $(name) | sed 's/^[^:]*: //' )
@@ -12,23 +12,23 @@ all: configure
 
 install: 
 	@echo installing ...
-	@mkdir -p $(prefix)/lcg/libexec/
+	@mkdir -p $(prefix)/libexec/
         
-	@install -m 0644 src/sge_helper $(prefix)/lcg/libexec/sge_helper
+	@install -m 0644 src/sge_helper $(prefix)/libexec/sge_helper
 
-	@mkdir -p $(prefix)/lcg/share/
-	@mkdir -p $(prefix)/lcg/share/docs/
-	@mkdir -p $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/
+	@mkdir -p $(prefix)/share/
+	@mkdir -p $(prefix)/share/doc/
+	@mkdir -p $(prefix)/share/doc/glite-info-dynamic-sge/
 
-	@install -m 0644 doc/AUTHORS $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/AUTHORS
-	@install -m 0644 doc/CREDITS $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/CREDITS        
-	@install -m 0644 doc/LICENSE $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/LICENSE
-	@install -m 0644 doc/License.GPL $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/License.GPL        
-	@install -m 0644 doc/README $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/README
-	@install -m 0644 etc/cluster.state.template $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/cluster.state.template
-	@install -m 0644 etc/sample-info-reporter.conf.template $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/sample-info-reporter.conf.template
-	@install -m 0644 etc/sample-vqueues.conf.template $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/sample-vqueues.conf.template
-	@install -m 0644 etc/compare-output $(prefix)/lcg/share/docs/lcg-info-dynamic-sge/compare-output
+	@install -m 0644 doc/AUTHORS $(prefix)/share/doc/glite-info-dynamic-sge/AUTHORS
+	@install -m 0644 doc/CREDITS $(prefix)/share/doc/glite-info-dynamic-sge/CREDITS        
+	@install -m 0644 doc/LICENSE $(prefix)/share/doc/glite-info-dynamic-sge/LICENSE
+	@install -m 0644 doc/License.GPL $(prefix)/share/doc/glite-info-dynamic-sge/License.GPL        
+	@install -m 0644 doc/README $(prefix)/share/doc/glite-info-dynamic-sge/README
+	@install -m 0644 etc/cluster.state.template $(prefix)/share/doc/glite-info-dynamic-sge/cluster.state.template
+	@install -m 0644 etc/sample-info-reporter.conf.template $(prefix)/share/doc/glite-info-dynamic-sge/sample-info-reporter.conf.template
+	@install -m 0644 etc/sample-vqueues.conf.template $(prefix)/share/doc/glite-info-dynamic-sge/sample-vqueues.conf.template
+	@install -m 0644 etc/compare-output $(prefix)/share/doc/glite-info-dynamic-sge/compare-output
 clean::
 	rm -rf rpmbuild 
 	rm -rf RPMS
