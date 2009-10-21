@@ -1,4 +1,5 @@
 #! /usr/bin/perl
+#use diagnostics;
 
 # If you modify this script locally,  please append a suitable suffix
 # to this version string
@@ -556,8 +557,9 @@ sub gen_lrmsinfo {
 	
 	push( @results, ( $results{$jobid} = \%res ) );
     }
-    
-    $twig->dispose;
+ 
+# Prevents scrip to work in XML::Twig 3.26
+#    $twig->dispose;
     1;
 }
 
@@ -586,8 +588,9 @@ sub gen_classad {
     }
     
     $results[ ( defined( $jl ) ? $jl->[0] : $index++ ) ] = \%res;
-    
-    $twig->dispose;
+
+# Prevents scrip to work in XML::Twig 3.26    
+#    $twig->dispose;
     1;
 }
 
@@ -753,8 +756,9 @@ sub process_queue {
 	    }
 	}
     }
-    
-    $twig->dispose;
+
+# Prevents scrip to work in XML::Twig 3.26 
+#    $twig->dispose;
     1;
 }
 
