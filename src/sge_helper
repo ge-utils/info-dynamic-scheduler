@@ -265,6 +265,7 @@ if ( $INFO ) {
 
 	printf( "%s\n", $dn );
 	printf( "GlueCEInfoLRMSVersion: %s\n", ( $SGE{$CELL}->{'version'} || 'unknown' ) );
+        printf( "GlueCEPolicyAssignedJobSlots: %d\n", ( $counts[1] || 0 ) );
 	printf( "GlueCEPolicyMaxTotalJobs: %d\n", $SGE{$CELL}->{'max_jobs'} )
 	    if $SGE{$CELL}->{'max_jobs'};
 	printf( "GlueCEPolicyMaxRunningJobs: %d\n", ( $counts[0] || 0 ) );
