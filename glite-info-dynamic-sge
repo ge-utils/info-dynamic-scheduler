@@ -61,7 +61,7 @@ my $USED_cpus = 0;
 my %HOST_freecpus;
 
 my $DEFAULT_CONFIG_FILE      = '/etc/sge-jobmanager/info-reporter.conf';
-my $DEFAULT_LRMS_CONFIG_FILE = '/opt/lcg/etc/lcg-info-dynamic-scheduler.conf';
+my $DEFAULT_LRMS_CONFIG_FILE = '/etc/lcg-info-dynamic-scheduler.conf';
 my $DEFAULT_VQUEUE_FILE      = '/etc/sge-jobmanager/vqueues.conf';
 
 my %NEEDED_RESOURCEINFO;
@@ -87,7 +87,7 @@ my ( %CONFIG );
 my ( %FILEPROCESSED );
 
 # Path to static LDIF file
-$CONFIG{'ldif_file'}            = '/opt/glite/etc/gip/ldif/static-file-CE.ldif';
+$CONFIG{'ldif_file'}            = '/var/lib/bdii/gip/ldif/static-file-CE.ldif';
 
 # Path to SGE jobmanager virtual queue mapping configuration file.
 $CONFIG{'vqueue_file'}          = undef;
@@ -224,8 +224,8 @@ if ( $QSTAT ) {
     foreach my $cell ( @cells ) {
 	&get_sge_version( $cell );
 	&get_sge_settings( $cell );
-
-	my ( @command ) = ( 'qstat', '-xml', '-f', '-u', '*', '-r' );
+#FIX THIS
+	my ( @command ) = ( $CONFIG{'qstat_command'}, '-xml', '-f', '-u', '*', '-r' );
 	push( @command, '-F', $needed_resourceinfo ) if $needed_resourceinfo;
 	
 	my $qstatdata = &run_sge_command( $cell, undef, @command );
@@ -901,7 +901,7 @@ sub get_sge_version {
     my ( $cell ) = @_;
     my ( $version );
 
-    my $qstatinfo = &run_sge_command( $cell, '2>&1', 'qstat', '-help' );
+    my $qstatinfo = &run_sge_command( $cell, '2>&1', $CONFIG{'qstat_command'}, '-help' );
 
     while( defined( $_ = $qstatinfo->getline ) ) {
 	$SGE{$cell}->{'version'} = $1 if ! $version && /^S?GE (\S+)$/;
@@ -912,8 +912,8 @@ sub get_sge_version {
 
 sub get_sge_settings {
     my ( $cell ) = @_;
-
-    my $qconfdata = &run_sge_command( $cell, undef, 'qconf', '-sconf' );
+#FIX THIS
+    my $qconfdata = &run_sge_command( $cell, undef, $CONFIG{'qconf_command'} , '-sconf' );
     
     while( defined( $_ = $qconfdata->getline ) ) {
 	if ( /^max_jobs\s+(\d+)$/ ) {
