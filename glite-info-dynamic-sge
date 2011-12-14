@@ -60,9 +60,9 @@ my $LRMSINFO_CONFIG_FILE;
 my $USED_cpus = 0;
 my %HOST_freecpus;
 
-my $DEFAULT_CONFIG_FILE      = '/etc/sge-jobmanager/info-reporter.conf';
-my $DEFAULT_LRMS_CONFIG_FILE = '/etc/lcg-info-dynamic-scheduler.conf';
-my $DEFAULT_VQUEUE_FILE      = '/etc/sge-jobmanager/vqueues.conf';
+my $DEFAULT_CONFIG_FILE        = '/etc/lrms/sge.conf';
+my $DEFAULT_LRMS_CONFIG_FILE   = '/etc/lcg-info-dynamic-scheduler.conf';
+my $DEFAULT_VQUEUE_FILE        = '/etc/lrms/vqueues.conf';
 
 my %NEEDED_RESOURCEINFO;
 
@@ -86,8 +86,15 @@ my ( %CONFIG );
 
 my ( %FILEPROCESSED );
 
+my @ManagerDNs;         # A dn found in the static Glue2 manager ldif file
+my @ShareDNs;           # A dn found in the static Glue2 share ldif file
+
 # Path to static LDIF file
-$CONFIG{'ldif_file'}            = '/var/lib/bdii/gip/ldif/static-file-CE.ldif';
+$CONFIG{'glue1-static-file-ce'}                = '/var/lib/bdii/gip/ldif/static-file-CE.ldif';
+$CONFIG{'glue2-static-file-computing-manager'} = '/var/lib/bdii/gip/ldif/ComputingManager.ldif';
+$CONFIG{'glue2-static-file-computing-share'}   = '/var/lib/bdii/gip/ldif/ComputingShare.ldif';
+
+$CONFIG{'outputformat'} = undef;
 
 # Path to SGE jobmanager virtual queue mapping configuration file.
 $CONFIG{'vqueue_file'}          = undef;
@@ -97,7 +104,7 @@ $CONFIG{'time'}                 = time;
 
 # Path to file defining current cluster state.
 # (One of 'Production', 'Draining', 'Queueing', 'Closed')
-$CONFIG{'state_file'}           = '/etc/sge-jobmanager/cluster.state';
+$CONFIG{'state_file'}           = '/etc/lrms/cluster.state';
 
 # Regexp values for matching/excluding queues to be considered
 $CONFIG{'queue_include_regexp'} = undef;
@@ -211,7 +218,11 @@ if ( $INFO || $VOMAXJOBS || $LRMS ) {
 if ( $QSTAT || $INFO || $VOMAXJOBS ) {
     &read_config_file( $DEFAULT_CONFIG_FILE ) if defined( $DEFAULT_CONFIG_FILE ) && -f $DEFAULT_CONFIG_FILE;
     &read_config_file( $DEFAULT_LRMS_CONFIG_FILE ) if defined( $DEFAULT_LRMS_CONFIG_FILE ) && -f $DEFAULT_LRMS_CONFIG_FILE;
-    &read_ldif_file();
+    &read_ldif_file( $CONFIG{'glue1-static-file-ce'} ) if $CONFIG{'outputformat'} =~ m/glue1/i;
+    if ( $CONFIG{'outputformat'} =~ m/glue2/i ) {
+        &read_ldif_file( $CONFIG{'glue2-static-file-computing-manager'} );
+        &read_ldif_file( $CONFIG{'glue2-static-file-computing-share'} );
+    }
     &read_vqueue_file();
 }
 
@@ -224,8 +235,8 @@ if ( $QSTAT ) {
     foreach my $cell ( @cells ) {
 	&get_sge_version( $cell );
 	&get_sge_settings( $cell );
-#FIX THIS
-	my ( @command ) = ( $CONFIG{'qstat_command'}, '-xml', '-f', '-u', '*', '-r' );
+
+	my ( @command ) = ( 'qstat', '-xml', '-f', '-u', '*', '-r' );
 	push( @command, '-F', $needed_resourceinfo ) if $needed_resourceinfo;
 	
 	my $qstatdata = &run_sge_command( $cell, undef, @command );
@@ -239,57 +250,27 @@ if ( $QSTAT ) {
     }
 }
 
-if ( $INFO ) {
-    # TODO: Values involving $SGE{$CELL} should check to see which cell the queue is associated with
-    
-    &read_clusterstate_file();
-    
-    foreach ( @DNs ) {
-	my ( $dn, $qname ) = @{$_};
-	my ( $maxwalltime ) = $QUEUE_minlimits{$qname}->{'rt'};
-	my ( $maxcputime  ) = $QUEUE_minlimits{$qname}->{'cpu'};
-	my ( @counts );
-
-	foreach my $c ( values %{$QUEUE_counts{$qname}} ) {
-	    map( $counts[$_] += $c->[$_], 0 .. $#{$c} );
-	}
-
-	$maxwalltime = int( $maxcputime / ( $CONFIG{'job_efficiency'} || 1 ) ) if ! defined( $maxwalltime ) && defined( $maxcputime );
-	$maxwalltime = $CONFIG{'default_duration'} unless defined( $maxwalltime );
-	
-	$maxcputime  = int( $maxwalltime * ( $CONFIG{'job_efficiency'} || 1 ) ) if ! defined( $maxcputime ) && defined( $maxwalltime );
-	$maxcputime  = 0 unless defined( $maxcputime );
-	
-	# Sanity check
-	$maxcputime = $maxwalltime if defined( $maxcputime ) && defined( $maxwalltime ) && $maxcputime > $maxwalltime;
-
-	printf( "%s\n", $dn );
-	printf( "GlueCEInfoLRMSVersion: %s\n", ( $SGE{$CELL}->{'version'} || 'unknown' ) );
-        printf( "GlueCEPolicyAssignedJobSlots: %d\n", ( $counts[1] || 0 ) );
-	printf( "GlueCEPolicyMaxTotalJobs: %d\n", $SGE{$CELL}->{'max_jobs'} )
-	    if $SGE{$CELL}->{'max_jobs'};
-	printf( "GlueCEPolicyMaxRunningJobs: %d\n", ( $counts[0] || 0 ) );
-	printf( "GlueCEInfoTotalCPUs: %d\n", ( $counts[1] || 0 ) );
-	printf( "GlueCEStateFreeJobSlots: %d\n", ( $counts[2] || 0 ) );
-	printf( "GlueCEStateFreeCPUs: %d\n", ( $counts[2] || 0 ) );
-	printf( "GlueCEPolicyMaxCPUTime: %d\n", ( $maxcputime / 60 ) );
-	printf( "GlueCEPolicyMaxWallClockTime: %d\n", ( $maxwalltime / 60 ) );
-	printf( "GlueCEStateStatus: %s\n", $CONFIG{'clusterstate'} );
-	print( "\n" );
-    }
+if ( $INFO) {
+ 
+    ## GLUE1 ## 
+    print_glue_data("glue1-static-file-CE", @DNs); 
+ 
+    ## GLUE2 ##
+    print_glue_data("glue2-static-file-computing-manager", @{@ManagerDNs, });
+    print_glue_data("glue2-static-file-computing-share", @ShareDNs);
 
     exit( 0 );
 } elsif ( $VOMAXJOBS ) {
     my %SLOTTOTALS;
 
     foreach my $vo ( keys %VOGROUPS ) {
-	foreach my $grp ( keys %{$VOGROUPS{$vo}} ) {
-	    foreach my $q ( keys %{$VO_queues{$vo}} ) {
-		foreach my $h ( keys( %{$QUEUE_counts{$q}} ) ) {
-		    $SLOTTOTALS{$grp} += $QUEUE_counts{$q}->{$h}->[1];
-		}
+	    foreach my $grp ( keys %{$VOGROUPS{$vo}} ) {
+	        foreach my $q ( keys %{$VO_queues{$vo}} ) {
+		        foreach my $h ( keys( %{$QUEUE_counts{$q}} ) ) {
+		            $SLOTTOTALS{$grp} += $QUEUE_counts{$q}->{$h}->[1];
+		        }
+	        }
 	    }
-	}
     }
     
     printf "{ %s }\n", join( ',', map( "'$_' : $SLOTTOTALS{$_}", keys %SLOTTOTALS ) );
@@ -382,6 +363,69 @@ if ( $LRMS || $CLASSAD ) {
 		$res->{'statuschange'},
 		( $res->{'WorkerNode'} || '-' )
 	    );
+    }
+}
+
+
+sub print_glue_data {
+    my ( $type, @data ) = @_;
+
+    if ( $type eq "glue1-static-file-CE" || $type eq "glue2-static-file-computing-share" ) { 
+        
+        &read_clusterstate_file();
+        
+        foreach ( @data ) {
+            my ( $dn, $qname ) = @{$_};
+            my ( $maxwalltime ) = $QUEUE_minlimits{$qname}->{'rt'};
+            my ( $maxcputime  ) = $QUEUE_minlimits{$qname}->{'cpu'};
+            my ( @counts );
+
+            foreach my $c ( values %{$QUEUE_counts{$qname}} ) {
+                map( $counts[$_] += $c->[$_], 0 .. $#{$c} );
+            }
+
+            $maxwalltime = int( $maxcputime / ( $CONFIG{'job_efficiency'} || 1 ) ) if ! defined( $maxwalltime ) && defined( $maxcputime );
+            $maxwalltime = $CONFIG{'default_duration'} unless defined( $maxwalltime );
+
+            $maxcputime  = int( $maxwalltime * ( $CONFIG{'job_efficiency'} || 1 ) ) if ! defined( $maxcputime ) && defined( $maxwalltime );
+            $maxcputime  = 0 unless defined( $maxcputime );
+
+            # Sanity check
+            $maxcputime = $maxwalltime if defined( $maxcputime ) && defined( $maxwalltime ) && $maxcputime > $maxwalltime;    
+
+            if ( $type =~ m/glue1/i ) {
+                printf( "%s", $dn );
+                printf( "GlueCEInfoLRMSVersion: %s\n",        ( $SGE{$CELL}->{'version'} || 'unknown' ) );
+                printf( "GlueCEPolicyAssignedJobSlots: %d\n", ( $counts[1] || 0 ) );
+                printf( "GlueCEPolicyMaxTotalJobs: %d\n",     $SGE{$CELL}->{'max_jobs'} ) if $SGE{$CELL}->{'max_jobs'};
+                printf( "GlueCEPolicyMaxRunningJobs: %d\n",   ( $counts[0] || 0 ) );
+                printf( "GlueCEInfoTotalCPUs: %d\n",          ( $counts[1] || 0 ) );
+                printf( "GlueCEStateFreeJobSlots: %d\n",      ( $counts[2] || 0 ) );
+                printf( "GlueCEStateFreeCPUs: %d\n",          ( $counts[2] || 0 ) );
+                printf( "GlueCEPolicyMaxCPUTime: %d\n",       ( $maxcputime / 60 ) );
+                printf( "GlueCEPolicyMaxWallClockTime: %d\n", ( $maxwalltime / 60 ) );
+                printf( "GlueCEStateStatus: %s\n",            $CONFIG{'clusterstate'} );
+                print( "\n" );
+            }
+            elsif ( $type =~ m/glue2/i ) {
+                printf( "%s", $dn );
+                printf( "GLUE2ComputingShareMaxRunningJobs: %d\n", ( $counts[0] || 0 ) );
+                printf( "GLUE2ComputingShareMaxCPUTime: %s\n",     $maxcputime );
+                printf( "GLUE2ComputingShareMaxWallTime: %s\n",    $maxwalltime );
+                printf( "GLUE2ComputingShareServingState: %s\n",   $CONFIG{'clusterstate'} );
+                print( "\n" );
+            }
+        }
+    }
+    elsif ( $type eq "glue2-static-file-computing-manager" ) {
+        for ( @data ) {
+            printf( "%s", $_ );
+            printf( "GLUE2ManagerProductVersion: %s\n", $SGE{$CELL}->{'version'} );
+            print( "\n" );
+        }
+    }
+    else { 
+        printf( STDERR "GLUE version not known: %s\n", $type );
     }
 }
 
@@ -870,24 +914,46 @@ sub read_vqueue_file {
 #    in order to return sensible values when running as "vomaxjobs-sge"
 
 sub read_ldif_file {
-    die "location of static ldif file is unknown\n"
-	unless defined( $CONFIG{'ldif_file'} );
+    my ($filename) = @_; 
 
     my $enable_vqueues;
 
-    open( LDIFFILE, $CONFIG{'ldif_file'} ) 
-	or die "cannot open ".$CONFIG{'ldif_file'}.": $!\n";
-    
+    open( LDIFFILE, $filename ) 
+	or die "cannot open ".$filename.": $!\n";
+   
+    my $savedn;
     while( <LDIFFILE> ) {
-	if ( /^(dn\:\s*GlueCEUniqueID\=\S+\/(jobmanager|blah|cream)\-(lcgsge|sge)\-([^\,\s]+)\,.+)$/ ) {
-	    push( @DNs, [ $1, $4 ] );
-	    $enable_vqueues = 1 if $3 eq 'sge';
-	} elsif ( /^dn\:\s*GlueVOViewLocalID\=([^\s\,\.]+((?:\.[^\s\,\.]+)*))\,GlueCEUniqueID\=\S+\/(jobmanager|blah|cream)\-(lcgsge|sge)\-([^\,\s]+)\,.+$/ ) {
-	    $VO_TO_QUEUE{$1} = $5;
-	    $QUEUE_vos{$5}->{$1}++;
-	    $VO_queues{$1}->{$5}++;
-	    $VOGROUPS{$1}->{$1}++ unless $2;
-	}
+       
+        ## GLUE1 ##
+        if ( /^(dn\:\s*GlueCEUniqueID\=\S+\/(jobmanager|blah|cream)\-(lcgsge|sge)\-([^\,\s]+)\,.+)$/ ) {
+            push( @DNs, [ $1, $4 ] );
+            $enable_vqueues = 1 if $3 eq 'sge';
+        } elsif ( /^dn\:\s*GlueVOViewLocalID\=([^\s\,\.]+((?:\.[^\s\,\.]+)*))\,GlueCEUniqueID\=\S+\/(jobmanager|blah|cream)\-(lcgsge|sge)\-([^\,\s]+)\,.+$/ ) {
+            $VO_TO_QUEUE{$1} = $5;
+            $QUEUE_vos{$5}->{$1}++;
+            $VO_queues{$1}->{$5}++;
+            $VOGROUPS{$1}->{$1}++ unless $2;
+        }
+
+        ## GLUE2 ##
+        if ( /dn:\s+GLUE2ManagerId=/ ) {
+            push @ManagerDNs, $_;
+        }
+
+        if ( /dn:\s+GLUE2ShareID=/ ) {
+            $savedn = $_;
+        } 
+        else {
+            if ( /GLUE2ComputingShareMappingQueue:/ ) {
+                my $que = $_;
+                $que =~ s/GLUE2ComputingShareMappingQueue://;
+                $que =~ s/^\s+//;
+                $que =~ s/\s+$//;
+                chomp $que;
+                push( @ShareDNs, [ $savedn, $que ] );
+            }
+        }
+
     }
 
     close( LDIFFILE );
@@ -901,7 +967,7 @@ sub get_sge_version {
     my ( $cell ) = @_;
     my ( $version );
 
-    my $qstatinfo = &run_sge_command( $cell, '2>&1', $CONFIG{'qstat_command'}, '-help' );
+    my $qstatinfo = &run_sge_command( $cell, '2>&1', 'qstat', '-help' );
 
     while( defined( $_ = $qstatinfo->getline ) ) {
 	$SGE{$cell}->{'version'} = $1 if ! $version && /^S?GE (\S+)$/;
@@ -912,8 +978,8 @@ sub get_sge_version {
 
 sub get_sge_settings {
     my ( $cell ) = @_;
-#FIX THIS
-    my $qconfdata = &run_sge_command( $cell, undef, $CONFIG{'qconf_command'} , '-sconf' );
+
+    my $qconfdata = &run_sge_command( $cell, undef, 'qconf', '-sconf' );
     
     while( defined( $_ = $qconfdata->getline ) ) {
 	if ( /^max_jobs\s+(\d+)$/ ) {
@@ -980,7 +1046,7 @@ sub read_config_file {
 	    $vomap = 0;
 	    
 	    if ( $section eq 'main' && /^static_ldif_file\s*[\:\=]\s*(\S+)$/ ) {
-		$CONFIG{'ldif_file'} = $1;
+		$CONFIG{'glue1-static-file-ce'} = $1;
 	    }
 	    next;
 	}
@@ -1023,18 +1089,15 @@ sub read_config_file {
 sub process_config_entry {
     my ( $k, $v, $from ) = @_;
     
-    if    ( $k eq 'default_duration'           ) { $CONFIG{$k} = timeperiod( $v ); }
-    elsif ( $k =~ /^sge_(root|arch|cell)$/     ) { $ENV{"\U$k"} = $v; }
-    elsif ( $k eq 'setenv' 
-	    && $v =~ /^([^=]+)\=(.*)$/         ) { $ENV{$1} = $2; }
-    elsif ( $k eq 'debug_time' || $k eq 'time' ) { $CONFIG{'time'} = $v; }
-    elsif ( $k eq 'group'
-	    && $v =~ /^([^=]+)\=(.*)$/         ) { $VO_FROM_GROUP{$1} = $2; }
-    elsif ( $k eq 'login'
-	    && $v =~ /^([^=]+)\=(.*)$/         ) { $VO_FROM_LOGIN{$1} = $2; }
-    elsif ( $k eq 'config'                     ) { &process_config( $v ) unless $FILEPROCESSED{$v}; }
-    elsif ( exists( $CONFIG{$k} )              ) { $CONFIG{$k} = $v; }
-    elsif ( $IGNORECONFIG{$k}                  ) { 1; }
+    if    ( $k eq 'default_duration'                  ) { $CONFIG{$k} = timeperiod( $v ); }
+    elsif ( $k =~ /^sge_(root|arch|cell)$/            ) { $ENV{"\U$k"} = $v; }
+    elsif ( $k eq 'setenv' && $v =~ /^([^=]+)\=(.*)$/ ) { $ENV{$1} = $2; }
+    elsif ( $k eq 'debug_time' || $k eq 'time'        ) { $CONFIG{'time'} = $v; }
+    elsif ( $k eq 'group' && $v =~ /^([^=]+)\=(.*)$/  ) { $VO_FROM_GROUP{$1} = $2; }
+    elsif ( $k eq 'login' && $v =~ /^([^=]+)\=(.*)$/  ) { $VO_FROM_LOGIN{$1} = $2; }
+    elsif ( $k eq 'config'                            ) { &process_config( $v ) unless $FILEPROCESSED{$v}; }
+    elsif ( exists( $CONFIG{$k} )                     ) { $CONFIG{$k} = $v; }
+    elsif ( $IGNORECONFIG{$k}                         ) { 1; }
     else {
 	die "unrecognised configuration entry $from: $k=$v";
     }
