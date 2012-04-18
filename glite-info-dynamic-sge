@@ -6,9 +6,9 @@
 
 use constant VERSION => '0.903';
 
-# See LICENSE for licensing information.
-# See CREDITS for attributions.
-# See AUTHORS for information about the maintainers
+# See LICENSE - licensing information.
+# See CREDITS - attributions.
+# See AUTHORS - information about the maintainers
 
 # --- Compiler directives ------------------------------------------------
 
@@ -220,6 +220,11 @@ if ( $QSTAT || $INFO || $VOMAXJOBS ) {
     &read_config_file( $DEFAULT_LRMS_CONFIG_FILE ) if defined( $DEFAULT_LRMS_CONFIG_FILE ) && -f $DEFAULT_LRMS_CONFIG_FILE;
     &read_ldif_file( $CONFIG{'glue1-static-file-ce'} ) if $CONFIG{'outputformat'} =~ m/glue1/i;
     if ( $CONFIG{'outputformat'} =~ m/glue2/i ) {
+        &read_ldif_file( $CONFIG{'glue2-static-file-computing-manager'} );
+        &read_ldif_file( $CONFIG{'glue2-static-file-computing-share'} );
+    }
+    if ( $CONFIG{'outputformat'} =~ m/both/i ) {
+        &read_ldif_file( $CONFIG{'glue1-static-file-ce'} );
         &read_ldif_file( $CONFIG{'glue2-static-file-computing-manager'} );
         &read_ldif_file( $CONFIG{'glue2-static-file-computing-share'} );
     }
