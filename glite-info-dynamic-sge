@@ -625,8 +625,7 @@ sub gen_lrmsinfo {
         push( @results, ( $results{$jobid} = \%res ) );
     }
  
-    # Prevents scrip to work in XML::Twig 3.26
-    #    $twig->dispose;
+    $twig->purge;
     1;
 }
 
@@ -657,7 +656,7 @@ sub gen_classad {
     $results[ ( defined( $jl ) ? $jl->[0] : $index++ ) ] = \%res;
 
     # Prevents scrip to work in XML::Twig 3.26    
-    #    $twig->dispose;
+    $twig->purge;
     1;
 }
 
@@ -823,8 +822,7 @@ sub process_queue {
         }
     }
 
-    # Prevents scrip to work in XML::Twig 3.26 
-    #    $twig->dispose;
+    $twig->purge;
     1;
 }
 
@@ -1161,11 +1159,10 @@ sub qstat_to_file {
 sub get_qstat_data {
     my ( $cell, $do_caching, $needed_resourceinfo ) = @_;
     my $xmlref = XML::Twig->new(
-        'twig_roots' => { 
-            'job_list'   => ( $LRMS ? sub { &gen_lrmsinfo( $cell, @_ ); } : sub { &gen_classad( $cell, @_ ); } ),
-            'Queue-List' => sub { &process_queue( $cell, @_ ); }
-        } 
+        'twig_roots' => { 'job_list'   => ( $LRMS ? sub { &gen_lrmsinfo( $cell, @_ ); } : sub { &gen_classad( $cell, @_ ); } ) },
+        'twig_roots' => { 'Queue-List' => sub { &process_queue( $cell, @_ ); } } 
     );
+
     my $cmd_base = "$CONFIG{'qstat_command'} -xml -f -u '*' -r"; 
     my $cmd = $needed_resourceinfo ? sprintf( "%s -F %s", $cmd_base, $needed_resourceinfo ) : $cmd_base;
     my $fname = undef;
