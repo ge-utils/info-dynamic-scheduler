@@ -625,7 +625,19 @@ sub gen_lrmsinfo {
         push( @results, ( $results{$jobid} = \%res ) );
     }
  
-    $twig->purge;
+     # Clear twig elements for jobs in pending state
+     # and which are not nested inside 'Queue-List' elements
+     # Nested elements will be all purged simultaneously in 
+     # the process_queue subroutine
+     #
+     # <job_info>
+     #    <job_List>
+     #       ...
+     #    </job_List>
+     # </job_info>"
+     if ( $job->parent->gi ne 'Queue-List' ) {
+         $twig->purge;
+     }
     1;
 }
 
@@ -655,8 +667,19 @@ sub gen_classad {
     
     $results[ ( defined( $jl ) ? $jl->[0] : $index++ ) ] = \%res;
 
-    # Prevents scrip to work in XML::Twig 3.26    
-    $twig->purge;
+    # Clear twig elements for jobs in pending state
+    # and which are not nested inside 'Queue-List' elements
+    # Nested elements will be all purged simultaneously in 
+    # the process_queue subroutine
+    #
+    # <job_info>
+    #    <job_List>
+    #       ...
+    #    </job_List>
+    # </job_info>"
+    if ( $job->parent->gi ne 'Queue-List' ) {
+        $twig->purge;
+    }
     1;
 }
 
@@ -822,7 +845,16 @@ sub process_queue {
         }
     }
 
-    $twig->purge;
+    # Safe to purge the whole twig element
+    # since process_queue is called after the subroutines
+    # dealing with job_list elements
+    # <Queue-List>
+    #    ...
+    #    <job_list>
+    #    ...
+    #    </job_list>
+    # </Queue-List>
+    $twig->purge
     1;
 }
 
@@ -1159,10 +1191,11 @@ sub qstat_to_file {
 sub get_qstat_data {
     my ( $cell, $do_caching, $needed_resourceinfo ) = @_;
     my $xmlref = XML::Twig->new(
-        'twig_roots' => { 'job_list'   => ( $LRMS ? sub { &gen_lrmsinfo( $cell, @_ ); } : sub { &gen_classad( $cell, @_ ); } ) },
-        'twig_roots' => { 'Queue-List' => sub { &process_queue( $cell, @_ ); } } 
+        'twig_roots' => { 
+            'job_list'   => ( $LRMS ? sub { &gen_lrmsinfo( $cell, @_ ); } : sub { &gen_classad( $cell, @_ ); } ),
+            'Queue-List' => sub { &process_queue( $cell, @_ ); }
+        } 
     );
-
     my $cmd_base = "$CONFIG{'qstat_command'} -xml -f -u '*' -r"; 
     my $cmd = $needed_resourceinfo ? sprintf( "%s -F %s", $cmd_base, $needed_resourceinfo ) : $cmd_base;
     my $fname = undef;
@@ -1179,4 +1212,6 @@ sub get_qstat_data {
     &qstat_to_file( $fname, $data ) unless ( $mtime && (time() - $mtime) < $CONFIG{'cache_expiration'} );
     
     $do_caching ? $xmlref->safe_parsefile( $fname ) : $xmlref->parse( $data );
+
+    $xmlref->dispose();
 }
