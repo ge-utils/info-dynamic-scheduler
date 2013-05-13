@@ -854,7 +854,7 @@ sub process_queue {
     #    ...
     #    </job_list>
     # </Queue-List>
-    $twig->purge
+    $twig->purge;
     1;
 }
 
