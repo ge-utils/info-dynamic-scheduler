@@ -1,28 +1,30 @@
-%define topdir %(pwd)/rpmbuild
-%define _topdir %{topdir} 
 Summary: Grid Engine info-provider.
-Name: glite-info-dynamic-ge
-Version: 7.0.0
-Vendor: CREAM GE utils <ge-support@listas.cesga.es>
+Name: glite-info-dynamic-sge
+Version: @VERSION@
+Vendor: CREAM Grid Engine utils <ge-support@listas.cesga.es>
 Release: 1.%{?dist}
 License: Apache Software License
 Group: System/Information
-Source: %{name}.src.tgz
+Source: %{name}-%{version}.src.tgz
 BuildArch: noarch
 Requires: perl-XML-Twig >= 3.0
 BuildRoot: %{_tmppath}/%{name}-%{version}-build
-Packager: Pablo Orviz <orviz@ifca.unican.es>
+#Obsoletes: glite-info-dynamic-sge
+Packager: GE utils team <ge-support@listas.cesga.es>
 URL: https://github.com/ge-utils/info-dynamic-scheduler
 
 %description
 Grid Engine info-provider.
 
 %prep
-
 %setup -c
 
 %build
-make install prefix=%{buildroot}
+%configure
+./configure --prefix=/usr/
+
+%install
+%{__make} install DESTDIR=%{buildroot}
 
 %files
 %defattr(0755,root,root)

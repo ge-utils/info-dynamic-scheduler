@@ -1,4 +1,4 @@
-# glite-info-dynamic-ge v7.0.0-1
+# glite-info-dynamic-ge v7.0.0
 
 ## Release notes 
 
