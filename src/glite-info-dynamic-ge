@@ -1182,7 +1182,7 @@ sub minval {
 
 sub qstat_to_file {
     my ( $fname, $data ) = @_;
-    
+   
     open (QSTAT_FH, '>', $fname);
     print QSTAT_FH $data;    
     close (QSTAT_FH);
@@ -1196,21 +1196,20 @@ sub get_qstat_data {
             'Queue-List' => sub { &process_queue( $cell, @_ ); }
         } 
     );
-    my $cmd_base = "$CONFIG{'qstat_command'} -xml -f -u '*' -r"; 
-    my $cmd = $needed_resourceinfo ? sprintf( "%s -F %s", $cmd_base, $needed_resourceinfo ) : $cmd_base;
     my $fname = undef;
     my $mtime = undef;
+    my $cmd_base = "$CONFIG{'qstat_command'} -xml -f -u '*' -r"; 
+    my $cmd = $needed_resourceinfo ? sprintf( "%s -F %s", $cmd_base, $needed_resourceinfo ) : $cmd_base;
+    my $data = `$cmd`;
 
     if ( $do_caching ) {
         use File::stat;
     
         $fname = "$CONFIG{'cache_dir'}/qstat.$cell.xml";
         $mtime = stat( $fname )->mtime if -e $fname;
+        &qstat_to_file( $fname, $data ) unless ( $mtime && (time() - $mtime) < $CONFIG{'cache_expiration'} ); 
     }
-    
-    my $data = `$cmd`;
-    &qstat_to_file( $fname, $data ) unless ( $mtime && (time() - $mtime) < $CONFIG{'cache_expiration'} );
-    
+
     $do_caching ? $xmlref->safe_parsefile( $fname ) : $xmlref->parse( $data );
 
     $xmlref->dispose();
