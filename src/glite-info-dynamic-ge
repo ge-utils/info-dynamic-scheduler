@@ -1,4 +1,4 @@
-#! /usr/bin/perl
+#!/usr/bin/perl
 #use diagnostics;
 
 # If you modify this script locally,  please append a suitable suffix
@@ -18,6 +18,7 @@ use warnings;
 use Getopt::Long;
 use IO::File;
 use IO::Pipe;
+use List::Util qw( min max );
 use POSIX qw( strftime );
 use XML::Twig;
 use Time::Local;
@@ -254,6 +255,7 @@ if ( $QSTAT ) {
     foreach my $cell ( @cells ) {
         &get_sge_version( $cell );
         &get_sge_settings( $cell );
+        &get_sge_max_slots_per_job( $cell );
         
         my $do_caching = defined( $CONFIG{'cache_dir'} ) && defined( $CONFIG{'cache_expiration'} ); 
         &get_qstat_data( $cell, $do_caching, $needed_resourceinfo );
@@ -414,21 +416,23 @@ sub print_glue_data {
             if ( $type =~ m/glue1/i ) {
                 printf( "%s\n", $dn );
                 printf( "GlueCEInfoLRMSVersion: %s\n",        ( $SGE{$CELL}->{'version'} || 'unknown' ) );
-                printf( "GlueCEPolicyAssignedJobSlots: %d\n", ( $counts[1] || 0 ) );
-                printf( "GlueCEPolicyMaxTotalJobs: %d\n",     $SGE{$CELL}->{'max_jobs'} ) if $SGE{$CELL}->{'max_jobs'};
-                printf( "GlueCEPolicyMaxRunningJobs: %d\n",   ( $counts[0] || 0 ) );
                 printf( "GlueCEInfoTotalCPUs: %d\n",          ( $counts[1] || 0 ) );
-                printf( "GlueCEStateFreeJobSlots: %d\n",      ( $counts[2] || 0 ) );
-                printf( "GlueCEStateFreeCPUs: %d\n",          ( $counts[2] || 0 ) );
+                printf( "GlueCEPolicyAssignedJobSlots: %d\n", ( $counts[1] || 0 ) );
                 printf( "GlueCEPolicyMaxCPUTime: %d\n",       ( $maxcputime / 60 ) );
+                printf( "GlueCEPolicyMaxRunningJobs: %d\n",   ( $counts[0] || 0 ) );
+                printf( "GlueCEPolicyMaxSlotsPerJob: %d\n",   $SGE{$CELL}->{'max_slots_per_job'} ) if $SGE{$CELL}->{'max_slots_per_job'};
+                printf( "GlueCEPolicyMaxTotalJobs: %d\n",     $SGE{$CELL}->{'max_jobs'} ) if $SGE{$CELL}->{'max_jobs'};
                 printf( "GlueCEPolicyMaxWallClockTime: %d\n", ( $maxwalltime / 60 ) );
+                printf( "GlueCEStateFreeCPUs: %d\n",          ( $counts[2] || 0 ) );
+                printf( "GlueCEStateFreeJobSlots: %d\n",      ( $counts[2] || 0 ) );
                 printf( "GlueCEStateStatus: %s\n",            $CONFIG{'clusterstate'} );
                 print( "\n" );
             }
             elsif ( $type =~ m/glue2/i ) {
                 printf( "%s", $dn );
-                printf( "GLUE2ComputingShareMaxRunningJobs: %d\n", ( $counts[0] || 0 ) );
                 printf( "GLUE2ComputingShareMaxCPUTime: %s\n",     $maxcputime );
+                printf( "GLUE2ComputingShareMaxRunningJobs: %d\n", ( $counts[0] || 0 ) );
+                printf( "GLUE2ComputingShareMaxSlotsPerJob: %s\n", $SGE{$CELL}->{'max_slots_per_job'} ) if $SGE{$CELL}->{'max_slots_per_job'};
                 printf( "GLUE2ComputingShareMaxWallTime: %s\n",    $maxwalltime );
                 printf( "GLUE2ComputingShareServingState: %s\n",   $CONFIG{'clusterstate'} );
                 print( "\n" );
@@ -523,7 +527,7 @@ sub run_sge_command {
     my ( $cell, $stderr, $command, @args ) = @_;
 
     $command = $CONFIG{$command.'_command'} if $CONFIG{$command.'_command'};
-
+   
     my $pipe = new IO::Pipe;
     my $pid  = fork;
 
@@ -543,7 +547,6 @@ sub run_sge_command {
             open( STDERR, ( $stderr eq '2>&1' ? '>& STDOUT' : "> $stderr" ) )
             or die "cannot setup stderr: $!\n";
         }
-
         if ( $SGEROOT ) {
             exec( '/bin/sh', '-c', '. '.$SGEROOT.'/'.$cell.'/common/settings.sh ; exec $0 "$@"', $command, @args );
         } else {
@@ -1040,6 +1043,32 @@ sub get_sge_settings {
     }
 
     $qconfdata->close;
+}
+
+sub get_sge_max_slots_per_job {
+    my ( $cell ) = @_;
+    
+    my @pe_list;
+    my $pe_data = &run_sge_command( $cell, undef, 'qconf', '-spl' );
+    while(<$pe_data>) { 
+        chomp; 
+        push @pe_list, $_;
+    }
+    $pe_data->close;
+
+    my @slots;
+    foreach my $pe ( @pe_list ) {
+        my $pe_info = &run_sge_command( $cell, undef, 'qconf', '-sp', $pe );
+        foreach my $line (<$pe_info>) {
+            if ( $line =~ /^slots/ ){
+                my @values = split(' ', $line);
+                push @slots, $values[1];
+            }
+        }
+        $pe_info->close;
+    }
+
+    $SGE{$cell}->{'max_slots_per_job'} = min @slots;
 }
 
 # Given the path to the local configuration file, extracts all of the 
