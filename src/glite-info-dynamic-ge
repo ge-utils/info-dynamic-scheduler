@@ -1022,7 +1022,7 @@ sub get_sge_version {
     my $qstatinfo = &run_sge_command( $cell, '2>&1', 'qstat', '-help' );
 
     while( defined( $_ = $qstatinfo->getline ) ) {
-        $SGE{$cell}->{'version'} = $2 if ! $version && /^(OGS\/)?S?GE (\S+)$/;
+        $SGE{$cell}->{'version'} = $2 if ! $version && /^(OGS\/)?[S,U]?GE (\S+)$/;
     }
 
     $qstatinfo->close;
