@@ -14,13 +14,15 @@ use constant VERSION => '0.903';
 
 use strict;
 use warnings;
+use feature "switch";
 
 use Getopt::Long;
 use IO::File;
 use IO::Pipe;
 use POSIX qw( strftime );
-use XML::Twig;
+use Scalar::Util qw(looks_like_number);
 use Time::Local;
+use XML::Twig;
 
 #
 # --- Constants ----------------------------------------------------------
@@ -78,6 +80,7 @@ my ( @VQUEUES, %VQUEUE );
 my ( %QUEUE_minlimits );
 my ( %QUEUE_maxwalltime );
 my ( %QUEUE_counts );
+my ( %QUEUE_limits );
 
 my ( %passwd_file_cache, %group_file_cache, %group_cache );
 
@@ -113,11 +116,6 @@ $CONFIG{'state_file'}           = '/etc/lrms/cluster.state';
 $CONFIG{'queue_include_regexp'} = undef;
 $CONFIG{'queue_exclude_regexp'} = undef;
 
-# Regexp values for matching/excluding users to be considered
-
-# Estimated efficiency of a typical job... for converting between wallclock & cputime
-$CONFIG{'job_efficiency'}       = 0.9;
-
 # IF not set in the config, the default values are calculated after the
 # config has been parsed as they are based on other config values
 $CONFIG{'qselect_command'}      = undef;
@@ -149,6 +147,9 @@ $IGNORECONFIG{'capture_file'}  = 1;
 
 my %SGE;
 
+# GLUE Defaults
+my $max_uint32 = 2**31-1;
+my $max_uint64 = 2**63-1;
 
 #
 # --- Command line args ------------------------------------------------------------
@@ -254,6 +255,7 @@ if ( $QSTAT ) {
     foreach my $cell ( @cells ) {
         &get_sge_version( $cell );
         &get_sge_settings( $cell );
+        &get_sge_queue_data( $cell );
         
         my $do_caching = defined( $CONFIG{'cache_dir'} ) && defined( $CONFIG{'cache_expiration'} ); 
         &get_qstat_data( $cell, $do_caching, $needed_resourceinfo );
@@ -393,44 +395,54 @@ sub print_glue_data {
         &read_clusterstate_file();
         
         foreach ( @data ) {
-            my ( $dn, $qname ) = @{$_};
-            my ( $maxwalltime ) = $QUEUE_minlimits{$qname}->{'rt'};
-            my ( $maxcputime  ) = $QUEUE_minlimits{$qname}->{'cpu'};
+            my ( $dn, $qname )         = @{$_};
             my ( @counts );
+            my ( $maxwalltime )        = $QUEUE_limits{$qname}->{'rt'};
+            my ( $maxcputime  )        = $QUEUE_limits{$qname}->{'cpu'};
+            my ( $maxrss )             = $QUEUE_limits{$qname}->{'rss'};
+            my ( $maxvmem )            = $QUEUE_limits{$qname}->{'vmem'};
+            my ( $maxslotsperjob )     = $QUEUE_limits{$qname}->{'max_slots_per_job'};
+            my ( $maxjobs )            = $SGE{$CELL}->{'max_jobs'};
+            my ( $maxuserjobs )        = $SGE{$CELL}->{'max_jobs_per_user'};
+            my ( $maxuserrunningjobs ) = $SGE{$CELL}->{'max_running_jobs_per_user'};
 
             foreach my $c ( values %{$QUEUE_counts{$qname}} ) {
                 map( $counts[$_] += $c->[$_], 0 .. $#{$c} );
             }
 
-            $maxwalltime = int( $maxcputime / ( $CONFIG{'job_efficiency'} || 1 ) ) if ! defined( $maxwalltime ) && defined( $maxcputime );
-            $maxwalltime = $CONFIG{'default_duration'} unless defined( $maxwalltime );
-
-            $maxcputime  = int( $maxwalltime * ( $CONFIG{'job_efficiency'} || 1 ) ) if ! defined( $maxcputime ) && defined( $maxwalltime );
-            $maxcputime  = 0 unless defined( $maxcputime );
-
             # Sanity check
             $maxcputime = $maxwalltime if defined( $maxcputime ) && defined( $maxwalltime ) && $maxcputime > $maxwalltime;    
+            my ( $maxuserwaitingjobs ) = $maxuserjobs - $maxuserrunningjobs;
 
             if ( $type =~ m/glue1/i ) {
                 printf( "%s\n", $dn );
                 printf( "GlueCEInfoLRMSVersion: %s\n",        ( $SGE{$CELL}->{'version'} || 'unknown' ) );
-                printf( "GlueCEPolicyAssignedJobSlots: %d\n", ( $counts[1] || 0 ) );
-                printf( "GlueCEPolicyMaxTotalJobs: %d\n",     $SGE{$CELL}->{'max_jobs'} ) if $SGE{$CELL}->{'max_jobs'};
-                printf( "GlueCEPolicyMaxRunningJobs: %d\n",   ( $counts[0] || 0 ) );
                 printf( "GlueCEInfoTotalCPUs: %d\n",          ( $counts[1] || 0 ) );
-                printf( "GlueCEStateFreeJobSlots: %d\n",      ( $counts[2] || 0 ) );
-                printf( "GlueCEStateFreeCPUs: %d\n",          ( $counts[2] || 0 ) );
-                printf( "GlueCEPolicyMaxCPUTime: %d\n",       ( $maxcputime / 60 ) );
-                printf( "GlueCEPolicyMaxWallClockTime: %d\n", ( $maxwalltime / 60 ) );
+                printf( "GlueCEPolicyAssignedJobSlots: %d\n", ( $counts[1] || $max_uint32 ) );
+                printf( "GlueCEPolicyMaxCPUTime: %d\n",       defined ( $maxcputime ) ? ( $maxcputime / 60 ) : $max_uint32 );
+                printf( "GlueCEPolicyMaxRunningJobs: %d\n",   defined ( $maxuserrunningjobs ) ? $maxuserrunningjobs : $max_uint32 );
+                printf( "GlueCEPolicyMaxSlotsPerJob: %d\n",   defined ( $maxslotsperjob ) ? $maxslotsperjob : $max_uint32 );
+                printf( "GlueCEPolicyMaxTotalJobs: %d\n",     defined ( $maxjobs ) ? $maxjobs : $max_uint32 );
+                printf( "GlueCEPolicyMaxWaitingJobs: %d\n",   defined ( $maxuserwaitingjobs ) ? $maxuserwaitingjobs : $max_uint32 );
+                printf( "GlueCEPolicyMaxWallClockTime: %d\n", defined ( $maxwalltime ) ? ( $maxwalltime / 60 ) : $max_uint32 );
+                #printf( "GlueCEStateFreeCPUs: %d\n",          ( $counts[2] || 0 ) );
+                #printf( "GlueCEStateFreeJobSlots: %d\n",      ( $counts[2] || 0 ) );
                 printf( "GlueCEStateStatus: %s\n",            $CONFIG{'clusterstate'} );
                 print( "\n" );
             }
             elsif ( $type =~ m/glue2/i ) {
                 printf( "%s", $dn );
-                printf( "GLUE2ComputingShareMaxRunningJobs: %d\n", ( $counts[0] || 0 ) );
-                printf( "GLUE2ComputingShareMaxCPUTime: %s\n",     $maxcputime );
-                printf( "GLUE2ComputingShareMaxWallTime: %s\n",    $maxwalltime );
-                printf( "GLUE2ComputingShareServingState: %s\n",   $CONFIG{'clusterstate'} );
+                printf( "GLUE2ComputingShareDefaultCPUTime: %s\n",   defined ( $maxcputime ) ? $maxcputime : $max_uint64 );
+                printf( "GLUE2ComputingShareDefaultWallTime: %s\n",  defined ( $maxwalltime ) ? $maxwalltime : $max_uint64 );
+                printf( "GLUE2ComputingShareMaxCPUTime: %s\n",       defined ( $maxcputime ) ? $maxcputime : $max_uint64 );
+                printf( "GLUE2ComputingShareMaxMainMemory: %s\n",    defined ( $maxrss ) ? $maxrss : $max_uint64 );
+                printf( "GLUE2ComputingShareMaxRunningJobs: %d\n",   defined ( $maxuserrunningjobs ) ? $maxuserrunningjobs : $max_uint32 );
+                printf( "GLUE2ComputingShareMaxSlotsPerJob: %s\n",   defined ( $maxslotsperjob ) ? $maxslotsperjob : $max_uint32 );
+                printf( "GLUE2ComputingShareMaxTotalJobs: %s\n",     defined ( $maxjobs ) ? $maxjobs : $max_uint32 );
+                printf( "GLUE2ComputingShareMaxVirtualMemory: %s\n", defined ( $maxvmem ) ? $maxvmem : $max_uint64 );
+                printf( "GLUE2ComputingShareMaxWaitingJobs: %d\n",   defined ( $maxuserwaitingjobs ) ? $maxuserwaitingjobs : $max_uint32 );
+                printf( "GLUE2ComputingShareMaxWallTime: %s\n",      defined ( $maxwalltime ) ? $maxwalltime : $max_uint64 );
+                printf( "GLUE2ComputingShareServingState: %s\n",     $CONFIG{'clusterstate'} );
                 print( "\n" );
             }
         }
@@ -438,7 +450,7 @@ sub print_glue_data {
     elsif ( $type eq "glue2-static-file-computing-manager" ) {
         for ( @data ) {
             printf( "%s", $_ );
-            printf( "GLUE2ManagerProductVersion: %s\n", $SGE{$CELL}->{'version'} );
+            printf( "GLUE2ManagerProductVersion: %s\n", $SGE{$CELL}->{'version'} || 'unknown' );
             print( "\n" );
         }
     }
@@ -1031,15 +1043,152 @@ sub get_sge_version {
 sub get_sge_settings {
     my ( $cell ) = @_;
 
-    my $qconfdata = &run_sge_command( $cell, undef, 'qconf', '-sconf' );
-    
+    my $qconfdata = &run_sge_command( $cell, '2>&1', 'qconf', '-sconf' );
     while( defined( $_ = $qconfdata->getline ) ) {
         if ( /^max_jobs\s+(\d+)$/ ) {
             $SGE{$cell}->{'max_jobs'} = $1;
         }
+        if ( /^max_u_jobs\s+(\d+)$/ ) {
+            $SGE{$cell}->{'max_jobs_per_user'} = $1; 
+        }
     }
-
+    $SGE{$cell}->{'max_jobs'} = $max_uint32 if $SGE{$cell}->{'max_jobs'} == 0; 
+    $SGE{$cell}->{'max_jobs_per_user'} = $max_uint32 if $SGE{$cell}->{'max_jobs_per_user'} == 0; 
     $qconfdata->close;
+
+    my $sched_data = &run_sge_command( $cell, '2>&1', 'qconf', '-ssconf' );
+    while( defined( $_ = $sched_data->getline ) ) {
+        if ( /^maxujobs\s+(\d+)$/ ) {
+            $SGE{$cell}->{'max_running_jobs_per_user'} = $1; 
+        }
+    }
+    $SGE{$cell}->{'max_running_jobs_per_user'} = $max_uint32 if $SGE{$cell}->{'max_running_jobs_per_user'} == 0; 
+    $sched_data->close;
+}
+
+# Returns the 'memory_specifier' (sge_types) in MBs
+sub to_mbytes {
+    my ( $size ) = @_;
+    my ( $unit ) = undef;
+    my ( $val )  = undef;
+
+    if ( looks_like_number( $size ) ) {
+        $val  = $size;
+    }
+    else {
+        $unit = substr $size,-1,1;
+        $val  = substr $size,0,-1;
+    }
+    
+    given ($unit) {
+        when ('k') { return $val / 1000; }
+        when ('K') { return $val / 1024; }
+        when ('m') { return ( $val * 1000 ) / 1024; }
+        when ('M') { return $val; }
+        when ('g') { return $val * 1000; }
+        when ('G') { return $val * 1024; }
+        when ('t') { return $val * 1000 * 1000; }
+        when ('T') { return $val * 1024 * 1024; }
+        default {
+            if ( looks_like_number( $unit ) ) {
+                return $val / ( 1024 * 1024 );
+            }
+        }
+    }
+}
+
+# Returns the 'time_specifier' (sge_types) in seconds
+sub to_seconds {
+    my ( $time ) = @_;
+   
+    if ( looks_like_number( $time ) ) {
+        if ( $time !~ /^INFINITY$/ ) {
+            return $time;
+        }
+    } 
+    elsif ( $time =~ /^[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}$/ ) {
+        my @a = split( /:/, $time );
+        foreach my $i ( @a ) {
+            $i =~ s/^0*//g;
+            $i = 0 if !( $i );
+        }
+        my ( $h, $m, $s ) = @a;
+        return $h*60*60 + $m*60 + $s;
+    }
+}
+
+sub get_sge_queue_data {
+    my ( $cell ) = @_;
+    my ( $qdata );
+    my ( $cpu );
+    my ( $rt );
+    my ( $rss );
+    my ( $vmem );
+    my ( $max_slots_per_job ); 
+
+    foreach my $qname ( @VQUEUES ) {
+        foreach my $k ( keys( %{$VQUEUE{$qname}} ) ) {
+            if ( $k eq "queue" ) {
+                $cpu  = undef;
+                $rt   = undef;
+                $rss = undef;
+                $vmem = undef;
+                $max_slots_per_job = undef;
+
+                my $sge_queue = $VQUEUE{$qname}->{$k};
+                $qdata = &run_sge_command( $cell, '2>&1', 'qconf', '-sq', $sge_queue );
+                foreach my $line ( <$qdata> ) {
+                    my @v = split(/\s+/, $line);
+                    my $param = shift(@v);
+
+                    given ($param) {
+                        when ( /^[hs]_cpu/ ) {
+                            my $value = &to_seconds( @v );
+                            if ( $value ) { 
+                                $cpu = $value if !( defined($cpu) ) or ( $value < $cpu );
+                            }
+                        }
+                        when ( /^[hs]_rt/ ) {
+                            my $value = &to_seconds( @v );
+                            if ( $value ) { 
+                                $rt = $value if !( defined($rt) ) or ( $value < $rt );
+                            }
+                        }
+                        when ( /^[hs]_rss/ ) { 
+                            my $value = &to_mbytes( $v[-1] );
+                            if ( $value ) { 
+                                $rss = $value if !( defined($rss) ) or ( $value < $rss );
+                            }
+                        }
+                        when ( /^[hs]_vmem/ ) { 
+                            my $value = &to_mbytes( $v[-1] );
+                            if ( $value ) { 
+                                $vmem = $value if !( defined($vmem) ) or ( $value < $vmem );
+                            }
+                        }
+                        when ( /^pe_list/ ) { 
+                            foreach my $pe ( @v ) {
+                                my $pe_data = &run_sge_command( $cell, '2>&1', 'qconf', '-sp', $pe );
+                                foreach my $pe_line ( <$pe_data> ) {
+                                    if ( $pe_line =~ /^slots/ ){
+                                        my @slots = split(' ', $pe_line);
+                                        $max_slots_per_job = $slots[1] if !( defined($max_slots_per_job) ) or ( $slots[1] < $max_slots_per_job )
+                                    }
+                                }
+                                $pe_data->close;
+                            }
+                        }
+                    }
+                }
+                $qdata->close;
+            }
+        }
+        $QUEUE_limits{$qname}->{'cpu'} = $cpu;
+        $QUEUE_limits{$qname}->{'rt'} = $rt;
+        $QUEUE_limits{$qname}->{'rss'} = $rss;
+        $QUEUE_limits{$qname}->{'vmem'} = $vmem;
+        $QUEUE_limits{$qname}->{'max_slots_per_job'} = $max_slots_per_job;
+    }
 }
 
 # Given the path to the local configuration file, extracts all of the 
