@@ -41,3 +41,6 @@ rm -rf %{buildroot}
 %changelog
 * Thu May 30 2013 - Pablo Orviz <orviz@ifca.unican.es> - 7.0.0
 - Handle /etc/lrms directory creation (GGUS #94312).
+* Fri Jun 13 2014 - Pablo Orviz <orviz@ifca.unican.es> - 7.1.0
+- Add missing GLUE2 attributes.
+- Support for UNIVA GridEngine.
