@@ -148,8 +148,8 @@ $IGNORECONFIG{'capture_file'}  = 1;
 my %SGE;
 
 # GLUE Defaults
-my $max_uint32 = 2**31-1;
-my $max_uint64 = 2**63-1;
+my $max_uint32 = 2147483647;
+my $max_uint64 = 9223372036854775807;
 
 #
 # --- Command line args ------------------------------------------------------------
