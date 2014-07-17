@@ -410,8 +410,17 @@ sub print_glue_data {
                 map( $counts[$_] += $c->[$_], 0 .. $#{$c} );
             }
 
-            # Sanity check
-            $maxcputime = $maxwalltime if defined( $maxcputime ) && defined( $maxwalltime ) && $maxcputime > $maxwalltime;    
+            # Sanity checks
+            ## cpu
+            $maxcputime = $maxwalltime if defined( $maxcputime ) && defined( $maxwalltime ) && $maxcputime > $maxwalltime;
+            ## mem
+            if ( defined ( $maxvmem ) && !( defined ( $maxrss ) ) ) {
+                $maxrss = $maxvmem;
+            }
+            else {
+                $maxrss = $maxvmem if defined ( $maxrss ) && defined ( $maxvmem ) && $maxrss > $maxvmem;
+            }
+
             my ( $maxuserwaitingjobs ) = $maxuserjobs - $maxuserrunningjobs;
 
             if ( $type =~ m/glue1/i ) {
