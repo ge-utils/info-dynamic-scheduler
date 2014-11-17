@@ -1,7 +1,20 @@
 # Table of Contents #
 
+- [glite-info-dynamic-ge v7.2.0](#glite-info-dynamic-ge-v7.2.0)
 - [glite-info-dynamic-ge v7.1.0](#glite-info-dynamic-ge-v7.1.0)
 - [glite-info-dynamic-ge v7.0.0](#glite-info-dynamic-ge-v7.0.0)
+
+
+## glite-info-dynamic-ge v7.2.0 ##
+
+### Release notes ###
+
+#### Features ####
+ * UNIVA milisecond precision (for time reporting) support (GGUS #109287).
+ * Support for both HH:MM:SS and number time formats (GGUS #102417).
+
+#### Fixed Issues ####
+ * Added sanity check for memory values (rss<=vmem) (GGUS #104815).
 
 
 
@@ -15,7 +28,7 @@
 
 #### Fixed Issues ####
  * Missing GLUE2 attributes added (GGUS #82902, #104815, #102416).
- 
+
 
 
 ## glite-info-dynamic-ge v7.0.0 ##

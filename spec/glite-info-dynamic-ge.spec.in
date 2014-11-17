@@ -44,3 +44,7 @@ rm -rf %{buildroot}
 * Fri Jun 13 2014 - Pablo Orviz <orviz@ifca.unican.es> - 7.1.0
 - Add missing GLUE2 attributes.
 - Support for UNIVA GridEngine.
+* Mon Nov 17 2014 - Pablo Orviz <orviz@ifca.unican.es> - 7.2.0
+- UNIVA milisecond precision (for time reporting) support (GGUS #109287).
+- Support for both HH:MM:SS and number time formats (GGUS #102417).
+- Added sanity check for memory values (rss<=vmem) (GGUS #104815).
