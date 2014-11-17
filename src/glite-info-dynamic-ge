@@ -1118,11 +1118,17 @@ sub to_mbytes {
 sub to_seconds {
     my ( $time ) = @_;
    
+    # Multi-definition (comma-separated) -> get first
+    my @time_a = split( /,/, $time );
+    $time = $time_a[0];
+
+    # 1) Digit
     if ( looks_like_number( $time ) ) {
         if ( $time !~ /^INFINITY$/ ) {
             return $time;
         }
-    } 
+    }
+    # 2) Time format
     elsif ( $time =~ /(^[0-9]+:[0-9]+:[0-9]+)/ ) {
         my @a = split( /:/, $1 );
         foreach my $i ( @a ) {
@@ -1158,6 +1164,7 @@ sub get_sge_queue_data {
                     my @v = split(/\s+/, $line);
                     my $param = shift(@v);
 
+                    # Hard-limits are prominent as they are always parsed after soft limits
                     given ($param) {
                         when ( /^[hs]_cpu/ ) {
                             my $value = &to_seconds( @v );
