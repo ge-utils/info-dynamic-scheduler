@@ -14,7 +14,9 @@ use constant VERSION => '0.903';
 
 use strict;
 use warnings;
-use feature "switch";
+
+#use feature "switch";
+use Switch;
 
 use Getopt::Long;
 use IO::File;
@@ -1097,16 +1099,16 @@ sub to_mbytes {
         $val  = substr $size,0,-1;
     }
     
-    given ($unit) {
-        when ('k') { return $val / 1000; }
-        when ('K') { return $val / 1024; }
-        when ('m') { return ( $val * 1000 ) / 1024; }
-        when ('M') { return $val; }
-        when ('g') { return $val * 1000; }
-        when ('G') { return $val * 1024; }
-        when ('t') { return $val * 1000 * 1000; }
-        when ('T') { return $val * 1024 * 1024; }
-        default {
+    switch ($unit) {
+        case ('k') { return $val / 1000; }
+        case ('K') { return $val / 1024; }
+        case ('m') { return ( $val * 1000 ) / 1024; }
+        case ('M') { return $val; }
+        case ('g') { return $val * 1000; }
+        case ('G') { return $val * 1024; }
+        case ('t') { return $val * 1000 * 1000; }
+        case ('T') { return $val * 1024 * 1024; }
+        else {
             if ( looks_like_number( $unit ) ) {
                 return $val / ( 1024 * 1024 );
             }
@@ -1165,32 +1167,32 @@ sub get_sge_queue_data {
                     my $param = shift(@v);
 
                     # Hard-limits are prominent as they are always parsed after soft limits
-                    given ($param) {
-                        when ( /^[hs]_cpu/ ) {
+                    switch ($param) {
+                        case ( /^[hs]_cpu/ ) {
                             my $value = &to_seconds( @v );
                             if ( $value ) { 
                                 $cpu = $value if !( defined($cpu) ) or ( $value < $cpu );
                             }
                         }
-                        when ( /^[hs]_rt/ ) {
+                        case ( /^[hs]_rt/ ) {
                             my $value = &to_seconds( @v );
                             if ( $value ) { 
                                 $rt = $value if !( defined($rt) ) or ( $value < $rt );
                             }
                         }
-                        when ( /^[hs]_rss/ ) { 
+                        case ( /^[hs]_rss/ ) { 
                             my $value = &to_mbytes( $v[-1] );
                             if ( $value ) { 
                                 $rss = $value if !( defined($rss) ) or ( $value < $rss );
                             }
                         }
-                        when ( /^[hs]_vmem/ ) { 
+                        case ( /^[hs]_vmem/ ) { 
                             my $value = &to_mbytes( $v[-1] );
                             if ( $value ) { 
                                 $vmem = $value if !( defined($vmem) ) or ( $value < $vmem );
                             }
                         }
-                        when ( /^pe_list/ ) { 
+                        case ( /^pe_list/ ) { 
                             foreach my $pe ( @v ) {
                                 my $pe_data = &run_sge_command( $cell, '2>&1', 'qconf', '-sp', $pe );
                                 foreach my $pe_line ( <$pe_data> ) {
